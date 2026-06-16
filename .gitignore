@@ -27,14 +27,11 @@ env/
 .ipynb_checkpoints/
 *.ipynb
 
-# Data (keep structure, ignore actual images)
+# Data (keep intermediate dirs ignored)
 data/raw/
 data/processed/
 data/external/
 data/merged/
-data/train/*/
-data/val/*/
-data/test/*/
 data/__pycache__/
 
 # Model weights (keep structure)
