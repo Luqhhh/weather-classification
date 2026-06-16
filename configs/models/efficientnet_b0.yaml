@@ -1,0 +1,27 @@
+# EfficientNet-B0 configuration
+
+model:
+  name: "efficientnet_b0"
+  pretrained: true
+  dropout: 0.3
+
+data:
+  image_size: 224
+
+training:
+  batch_size: 64
+  epochs: 50
+  optimizer:
+    name: "adamw"
+    lr: 1e-4
+    weight_decay: 1e-4
+  scheduler:
+    name: "cosine"
+    warmup_epochs: 3
+    min_lr: 1e-6
+
+# Expected characteristics:
+#   Params: ~5.3M
+#   Weight size: ~20 MB
+#   CPU latency (224x224): ~10-20ms
+#   Good accuracy/speed balance
