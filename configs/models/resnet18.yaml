@@ -1,0 +1,25 @@
+# ResNet18 configuration
+# Inherits defaults from configs/default.yaml
+
+model:
+  name: "resnet18"
+  pretrained: true
+  dropout: 0.3
+
+training:
+  batch_size: 64
+  epochs: 50
+  optimizer:
+    name: "adamw"
+    lr: 1e-4
+    weight_decay: 1e-4
+  scheduler:
+    name: "cosine"
+    warmup_epochs: 3
+    min_lr: 1e-6
+
+# Expected characteristics:
+#   Params: ~11.7M
+#   Weight size: ~45 MB
+#   CPU latency (224x224): ~15-25ms
+#   Good baseline — stable, fast CPU inference

@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""
+Model Evaluation Script
+
+Evaluates a trained model on a validation or test dataset.
+Generates metrics, confusion matrix, and per-class F1 scores.
+
+Usage:
+    python scripts/evaluate.py --weights weights/best.pth --config configs/models/resnet18.yaml
+"""
+
+import argparse
+import logging
+import sys
+from pathlib import Path
+
+import numpy as np
+import torch
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from data.dataset import WeatherDataset
+from data.label_mapping import load_label_mapping, detect_label_mapping
+from data.transforms import build_transforms
+from models.model_factory import create_model
+from training.metrics import compute_metrics, plot_confusion_matrix
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Evaluate a trained weather classification model"
+    )
+    parser.add_argument(
+        "--weights", type=str, required=True,
+        help="Path to model weights (.pth file)"
+    )
+    parser.add_argument(
+        "--config", type=str, default="configs/default.yaml",
+        help="Path to model config YAML"
+    )
+    parser.add_argument(
+        "--data_dir", type=str, default=None,
+        help="Path to evaluation data directory"
+    )
+    parser.add_argument(
+        "--label_mapping", type=str, default=None,
+        help="Path to label mapping JSON"
+    )
+    parser.add_argument(
+        "--output_dir", type=str, default="reports",
+        help="Directory for output files"
+    )
+    parser.add_argument(
+        "--batch_size", type=int, default=64,
+        help="Batch size for evaluation"
+    )
+    parser.add_argument(
+        "--device", type=str, default="cpu",
+        help="Device: 'cpu' or 'cuda'"
+    )
+    args = parser.parse_args()
+
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load config
+    import yaml
+    config = {}
+    config_path = Path(args.config)
+    if config_path.exists():
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+
+    model_cfg = config.get("model", {})
+    data_cfg = config.get("data", {})
+    data_dir = args.data_dir or data_cfg.get("val_dir") or data_cfg.get("test_dir")
+
+    if not data_dir:
+        logger.error("No evaluation data directory specified")
+        sys.exit(1)
+
+    # Label mapping
+    if args.label_mapping and Path(args.label_mapping).exists():
+        label_mapper = load_label_mapping(args.label_mapping)
+    else:
+        label_mapper = detect_label_mapping(data_dir)
+
+    logger.info(f"Classes: {label_mapper.labels}")
+
+    # Create model
+    model = create_model(
+        name=model_cfg.get("name", "resnet18"),
+        num_classes=label_mapper.num_classes,
+        pretrained=False,
+    )
+
+    # Load weights
+    state = torch.load(args.weights, map_location="cpu", weights_only=True)
+    if "model_state_dict" in state:
+        state = state["model_state_dict"]
+    model.load_state_dict(state)
+    model = model.to(args.device)
+    model.eval()
+    logger.info(f"Model loaded from {args.weights}")
+
+    # Build transforms and dataset
+    image_size = data_cfg.get("image_size", 224)
+    mean = tuple(data_cfg.get("mean", [0.485, 0.456, 0.406]))
+    std = tuple(data_cfg.get("std", [0.229, 0.224, 0.225]))
+
+    transform = build_transforms(mode="val", image_size=image_size, mean=mean, std=std)
+    dataset = WeatherDataset(data_dir=data_dir, transform=transform, label_mapper=label_mapper)
+
+    from torch.utils.data import DataLoader
+    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
+
+    # Run evaluation
+    logger.info(f"Evaluating on {len(dataset)} images...")
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        from tqdm import tqdm
+        for images, labels in tqdm(loader, desc="Evaluating"):
+            images = images.to(args.device)
+            logits = model(images)
+            preds = torch.argmax(logits, dim=1)
+            all_preds.extend(preds.cpu().numpy().tolist())
+            all_labels.extend(labels.numpy().tolist())
+
+    # Compute metrics
+    y_true = np.array(all_labels)
+    y_pred = np.array(all_preds)
+    metrics = compute_metrics(y_true, y_pred, label_mapper.labels)
+
+    # Print results
+    print("\n" + "=" * 60)
+    print("EVALUATION RESULTS")
+    print("=" * 60)
+    print(f"Model: {model_cfg.get('name', 'unknown')}")
+    print(f"Macro F1:  {metrics['macro_f1']:.4f}")
+    print(f"Accuracy:  {metrics['accuracy']:.4f}")
+    print(f"\nPer-class metrics:")
+    print(f"{'Class':>10s}  {'Precision':>9s}  {'Recall':>9s}  {'F1':>9s}  {'Support':>8s}")
+    print("-" * 56)
+    for cls_name, cls_metrics in metrics["per_class"].items():
+        print(
+            f"{cls_name:>10s}  {cls_metrics['precision']:>9.4f}  "
+            f"{cls_metrics['recall']:>9.4f}  {cls_metrics['f1']:>9.4f}  "
+            f"{cls_metrics['support']:>8d}"
+        )
+    if metrics["weak_classes"]:
+        print(f"\n⚠️  Weak classes (below avg F1): {', '.join(metrics['weak_classes'])}")
+    print("=" * 60)
+
+    # Save confusion matrix
+    cm = np.array(metrics["confusion_matrix"])
+    plot_confusion_matrix(
+        cm,
+        label_mapper.labels,
+        save_path=str(output_dir / "confusion_matrix.png"),
+        title=f"Confusion Matrix (Macro F1: {metrics['macro_f1']:.4f})",
+    )
+    logger.info(f"Confusion matrix saved to {output_dir}/confusion_matrix.png")
+
+
+if __name__ == "__main__":
+    main()

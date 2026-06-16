@@ -1,0 +1,88 @@
+# Weather Classification — Default Configuration
+# All model-specific configs inherit from this
+
+# ================== Data ==================
+data:
+  train_dir: "data/train"
+  val_dir: null           # If null, auto-split from train
+  test_dir: "data/test"
+  val_split: 0.2          # Fraction of training data to use for validation
+  num_workers: 4
+  pin_memory: true
+
+  # Image preprocessing
+  image_size: 224         # Input size (square)
+  mean: [0.485, 0.456, 0.406]   # ImageNet stats
+  std: [0.229, 0.224, 0.225]    # ImageNet stats
+
+  # Augmentation (training only)
+  augmentation:
+    random_resized_crop:
+      scale: [0.7, 1.0]
+      ratio: [0.9, 1.1]
+    random_horizontal_flip:
+      prob: 0.5
+    color_jitter:
+      brightness: 0.15     # Conservative — weather depends on color/lighting
+      contrast: 0.15
+      saturation: 0.15
+      hue: 0.05
+    random_rotation:
+      degrees: 10
+    # RandAugment — optional, enable for stronger augmentation
+    rand_augment: null
+    # MixUp / CutMix — optional
+    mixup_alpha: null      # e.g., 0.2
+    cutmix_alpha: null     # e.g., 1.0
+
+# ================== Model ==================
+model:
+  name: "resnet18"         # Options: resnet18, resnet34, efficientnet_b0, mobilenetv3_small, convnext_tiny
+  pretrained: true
+  num_classes: 4           # cloudy, rainy, snowy, sunny
+  dropout: 0.3
+  freeze_backbone: false
+
+# ================== Training ==================
+training:
+  batch_size: 64
+  epochs: 50
+  optimizer:
+    name: "adamw"
+    lr: 1e-4
+    weight_decay: 1e-4
+  scheduler:
+    name: "cosine"         # Options: cosine, step, plateau, onecycle
+    warmup_epochs: 3
+    min_lr: 1e-6
+    step_size: 15          # For step scheduler
+    step_gamma: 0.1        # For step scheduler
+  loss:
+    name: "cross_entropy"  # Options: cross_entropy, focal, label_smoothing
+    label_smoothing: 0.1
+  early_stopping:
+    patience: 10
+    min_delta: 0.001
+  checkpoint:
+    save_top_k: 3
+    monitor: "val_macro_f1"
+    mode: "max"
+
+# ================== Inference ==================
+inference:
+  device: "cpu"            # Final inference MUST be CPU
+  batch_size: 32           # Smaller batch for CPU
+  num_workers: 2
+  use_onnx: false          # ONNX runtime for CPU speedup
+  fp16: false              # Not used on CPU
+
+# ================== Logging ==================
+logging:
+  log_dir: "outputs"
+  experiment_name: null    # Auto-generated if null
+  tensorboard: true
+  wandb: false
+  log_interval: 10         # steps
+
+# ================== Reproducibility ==================
+seed: 42
