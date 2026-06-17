@@ -1,0 +1,21 @@
+{
+  "labels": [
+    "cloudy",
+    "rainy",
+    "snowy",
+    "sunny"
+  ],
+  "idx_to_label": {
+    "0": "cloudy",
+    "1": "rainy",
+    "2": "snowy",
+    "3": "sunny"
+  },
+  "label_to_idx": {
+    "cloudy": 0,
+    "rainy": 1,
+    "snowy": 2,
+    "sunny": 3
+  },
+  "num_classes": 4
+}
