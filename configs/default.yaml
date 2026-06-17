@@ -7,8 +7,8 @@ data:
   val_dir: null           # If null, auto-split from train
   test_dir: "data/test"
   val_split: 0.2          # Fraction of training data to use for validation
-  num_workers: 4
-  pin_memory: true
+  num_workers: 0           # 0 = single-process (avoids WSL2 deadlocks)
+  pin_memory: false        # false = no benefit on CPU
 
   # Image preprocessing
   image_size: 224         # Input size (square)
@@ -49,12 +49,12 @@ training:
   epochs: 50
   optimizer:
     name: "adamw"
-    lr: 1e-4
-    weight_decay: 1e-4
+    lr: 0.0001
+    weight_decay: 0.0001
   scheduler:
     name: "cosine"         # Options: cosine, step, plateau, onecycle
     warmup_epochs: 3
-    min_lr: 1e-6
+    min_lr: 0.000001
     step_size: 15          # For step scheduler
     step_gamma: 0.1        # For step scheduler
   loss:

@@ -1,0 +1,32 @@
+# ResNet18 — No augmentation baseline
+# Identical to resnet18.yaml except augmentation is fully disabled.
+# Used as a control experiment to measure augmentation's contribution.
+
+model:
+  name: "resnet18"
+  pretrained: true
+  dropout: 0.3
+
+training:
+  batch_size: 64
+  epochs: 50
+  optimizer:
+    name: "adamw"
+    lr: 0.0001
+    weight_decay: 0.0001
+  scheduler:
+    name: "cosine"
+    warmup_epochs: 3
+    min_lr: 0.000001
+
+# Disable all augmentation — train transforms = val transforms
+data:
+  augmentation:
+    random_resized_crop:
+      scale: [1.0, 1.0]       # No random crop — always take full image
+      ratio: [1.0, 1.0]       # No aspect ratio variation
+    random_horizontal_flip:
+      prob: 0.0               # No flipping
+    random_rotation:
+      degrees: 0              # No rotation
+    color_jitter: null         # No color changes
