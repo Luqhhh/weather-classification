@@ -65,6 +65,10 @@ def main():
         "--device", type=str, default="cpu",
         help="Device: 'cpu' or 'cuda'"
     )
+    parser.add_argument(
+        "--num_workers", type=int, default=None,
+        help="DataLoader workers for evaluation (defaults to config data.num_workers or 0)"
+    )
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -119,7 +123,10 @@ def main():
     dataset = WeatherDataset(data_dir=data_dir, transform=transform, label_mapper=label_mapper)
 
     from torch.utils.data import DataLoader
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
+    num_workers = args.num_workers
+    if num_workers is None:
+        num_workers = data_cfg.get("num_workers", 0)
+    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=num_workers)
 
     # Run evaluation
     logger.info(f"Evaluating on {len(dataset)} images...")
