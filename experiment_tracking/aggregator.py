@@ -168,9 +168,11 @@ class ExperimentAggregator:
     @staticmethod
     def _build_summary_table(results: List[ExperimentResult]) -> str:
         if not results:
-            return "| # | Experiment | Model | Loss | Size | Aug | Val F1 | rainy F1 | Best Epoch | CPU Time | Weight |\n"
-            "|---|-----------|-------|------|------|-----|--------|----------|------------|----------|--------|\n"
-            "*暂无实验数据*"
+            return (
+                "| # | Experiment | Model | Loss | Size | Aug | Val F1 | rainy F1 | CPU Time | Weight | Submit |\n"
+                "|---|-----------|-------|------|------|-----|--------|----------|----------|--------|--------|\n"
+                "| — | *暂无实验数据* | — | — | — | — | — | — | — | — | — |\n"
+            )
 
         header = (
             "| # | Experiment | Model | Loss | Size | Aug | Val F1 | rainy F1 | CPU Time | Weight | Submit |\n"
