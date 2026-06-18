@@ -3,6 +3,7 @@ Tests for the data pipeline: dataset loading, label mapping, transforms.
 """
 
 import tempfile
+import hashlib
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +11,7 @@ import pytest
 import torch
 from PIL import Image
 
-from data.dataset import WeatherDataset
+from data.dataset import WeatherDataset, create_dataloaders
 from data.label_mapping import LabelMapper, detect_label_mapping, load_label_mapping, save_label_mapping
 from data.transforms import build_transforms, get_train_transforms, get_val_transforms
 
@@ -154,3 +155,84 @@ class TestWeatherDataset:
         dataset = WeatherDataset(data_dir=tmp_path, transform=None)
         assert len(dataset) == 1  # Only the good image
         assert len(dataset.bad_images) == 1  # Bad image recorded
+
+    def test_create_dataloaders_deduplicates_and_stratifies_auto_split(self, tmp_path):
+        for cls in ["cloudy", "rainy"]:
+            (tmp_path / cls).mkdir()
+            for i in range(10):
+                color = (i * 10, 80, 120) if cls == "cloudy" else (120, i * 10, 80)
+                _save_image(tmp_path / cls / f"{cls}_{i}.jpg", color=color)
+
+        duplicate_bytes = (tmp_path / "cloudy" / "cloudy_0.jpg").read_bytes()
+        (tmp_path / "cloudy" / "cloudy_duplicate.jpg").write_bytes(duplicate_bytes)
+
+        train_loader, val_loader, _ = create_dataloaders(
+            data_dir=tmp_path,
+            batch_size=4,
+            num_workers=0,
+            val_split=0.2,
+            seed=42,
+        )
+
+        train_paths = _paths_from_wrapped_subset(train_loader.dataset)
+        val_paths = _paths_from_wrapped_subset(val_loader.dataset)
+
+        assert len(train_paths) == 16
+        assert len(val_paths) == 4
+        assert _class_counts(train_paths) == {"cloudy": 8, "rainy": 8}
+        assert _class_counts(val_paths) == {"cloudy": 2, "rainy": 2}
+        assert _hashes(train_paths).isdisjoint(_hashes(val_paths))
+
+    def test_create_dataloaders_drops_explicit_train_val_leakage(self, tmp_path):
+        train_dir = tmp_path / "train"
+        val_dir = tmp_path / "val"
+        for split_dir in [train_dir, val_dir]:
+            for cls in ["cloudy", "rainy"]:
+                (split_dir / cls).mkdir(parents=True)
+
+        _save_image(train_dir / "cloudy" / "train_cloudy.jpg", color=(10, 20, 30))
+        _save_image(train_dir / "rainy" / "train_rainy.jpg", color=(40, 50, 60))
+        _save_image(val_dir / "cloudy" / "val_cloudy.jpg", color=(70, 80, 90))
+        _save_image(val_dir / "rainy" / "val_rainy.jpg", color=(100, 110, 120))
+
+        leaked_bytes = (val_dir / "cloudy" / "val_cloudy.jpg").read_bytes()
+        (train_dir / "cloudy" / "leaked_from_val.jpg").write_bytes(leaked_bytes)
+        (val_dir / "cloudy" / "val_cloudy_duplicate.jpg").write_bytes(leaked_bytes)
+
+        train_loader, val_loader, _ = create_dataloaders(
+            data_dir=train_dir,
+            val_dir=val_dir,
+            batch_size=2,
+            num_workers=0,
+        )
+
+        train_paths = _paths_from_wrapped_subset(train_loader.dataset)
+        val_paths = _paths_from_wrapped_subset(val_loader.dataset)
+
+        assert len(train_paths) == 2
+        assert len(val_paths) == 2
+        assert all(path.name != "leaked_from_val.jpg" for path in train_paths)
+        assert sum(path.name.startswith("val_cloudy") for path in val_paths) == 1
+        assert _hashes(train_paths).isdisjoint(_hashes(val_paths))
+
+
+def _save_image(path: Path, color: tuple) -> None:
+    img = Image.new("RGB", (64, 64), color=color)
+    img.save(path)
+
+
+def _paths_from_wrapped_subset(dataset) -> list:
+    subset = dataset.subset
+    base_dataset = subset.dataset
+    return [base_dataset.images[idx][0] for idx in subset.indices]
+
+
+def _class_counts(paths: list) -> dict:
+    counts = {}
+    for path in paths:
+        counts[path.parent.name] = counts.get(path.parent.name, 0) + 1
+    return counts
+
+
+def _hashes(paths: list) -> set:
+    return {hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}

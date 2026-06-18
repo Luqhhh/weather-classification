@@ -206,7 +206,7 @@ SUBMIT_REQUIREMENTS = """# Weather Classification Inference Dependencies
 # Competition runtime caps PyTorch at 2.1.7.
 torch>=2.0.0,<=2.1.7
 torchvision>=0.15.0,<0.17.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0
 Pillow>=9.5.0
 """
 

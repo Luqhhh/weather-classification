@@ -81,6 +81,25 @@
 
 > **类别不平衡比 4.41:1** — rainy 和 snowy 是少数类。训练时建议使用项目中实现的 FocalLoss (`--training.loss.name focal`) 来缓解此问题。
 
+#### 验证集切分与去重
+
+训练默认使用显式验证集：
+
+```yaml
+data:
+  train_dir: "data/train"
+  val_dir: "data/val"
+```
+
+`data/val` 按类别比例从合并数据中切分，避免少数类 rainy / snowy 在验证集中比例异常。`create_dataloaders()` 还会在运行时按图片内容 `sha256` 去重：
+
+- `data/val` 内部重复图只保留一份。
+- `data/train` 内部重复图只保留一份。
+- 如果同一图片同时出现在 train 和 val，保留 val，丢弃 train 中的重复副本，避免验证泄漏。
+- 如果没有提供 `val_dir`，则从 `train_dir` 中做按类别分层的自动切分，并先按内容去重，确保重复图不会跨 train/val。
+
+当前数据检查结果：`data/val` 去掉 1 张重复图，`data/train` 去掉 37 张内部重复图，并去掉 13 张与验证集重复的训练图。
+
 #### 复现数据
 
 ```bash
