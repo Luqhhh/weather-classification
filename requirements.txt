@@ -35,3 +35,6 @@ omegaconf>=2.3.0
 
 # Testing
 pytest>=7.4.0
+
+# CPU benchmark
+psutil
