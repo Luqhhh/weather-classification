@@ -197,6 +197,7 @@ def main():
     # Create dataloaders
     train_loader, val_loader, _ = create_dataloaders(
         data_dir=data_dir,
+        val_dir=data_cfg.get("val_dir"),
         label_mapper=label_mapper,
         train_transform=train_transform,
         val_transform=val_transform,

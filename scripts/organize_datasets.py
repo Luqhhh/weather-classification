@@ -15,8 +15,9 @@ import logging
 import shutil
 import sys
 import zipfile
+import hashlib
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import numpy as np
 from tqdm import tqdm
@@ -185,7 +186,7 @@ def create_train_val_split(
     val_split: float = VAL_SPLIT,
     seed: int = RANDOM_SEED,
 ) -> Dict[str, int]:
-    """Create stratified train/val split from merged data."""
+    """Create content-deduplicated stratified train/val split from merged data."""
     logger.info(f"Creating train/val split (val={val_split:.0%}, seed={seed})...")
 
     rng = np.random.RandomState(seed)
@@ -193,7 +194,8 @@ def create_train_val_split(
     val_dir = Path("data/val")
     test_dir = Path("data/test")
 
-    stats = {"train": 0, "val": 0}
+    stats = {"train": 0, "val": 0, "duplicates_skipped": 0}
+    seen_hashes: Set[str] = set()
 
     for cls in TARGET_CLASSES:
         cls_src = source_dir / cls
@@ -203,6 +205,17 @@ def create_train_val_split(
 
         images = sorted([f for f in cls_src.iterdir()
                          if f.is_file() and f.suffix.lower() in IMG_EXTENSIONS])
+        unique_images = []
+        duplicates_skipped = 0
+        for img in images:
+            content_hash = file_sha256(img)
+            if content_hash in seen_hashes:
+                duplicates_skipped += 1
+                continue
+            seen_hashes.add(content_hash)
+            unique_images.append(img)
+
+        images = unique_images
         rng.shuffle(images)
 
         n_val = max(1, int(len(images) * val_split))
@@ -224,7 +237,11 @@ def create_train_val_split(
 
         stats["train"] += len(train_imgs)
         stats["val"] += len(val_imgs)
-        logger.info(f"  {cls}: train={len(train_imgs)}, val={len(val_imgs)}")
+        stats["duplicates_skipped"] += duplicates_skipped
+        logger.info(
+            f"  {cls}: train={len(train_imgs)}, val={len(val_imgs)}"
+            + (f", duplicates_skipped={duplicates_skipped}" if duplicates_skipped else "")
+        )
 
     # Create minimal test set for smoke testing
     test_dir.mkdir(parents=True, exist_ok=True)
@@ -239,6 +256,15 @@ def create_train_val_split(
                     shutil.copy2(img, tgt)
 
     return stats
+
+
+def file_sha256(path: Path) -> str:
+    """Return a content hash used to keep duplicate images out of train/val."""
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def save_label_mapping() -> None:

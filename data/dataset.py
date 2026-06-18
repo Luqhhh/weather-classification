@@ -12,11 +12,13 @@ Robust dataset loader that handles:
 
 import logging
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from collections import Counter, defaultdict
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+import hashlib
 
 import torch
 from PIL import Image, ImageFile
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader, Dataset, Subset
 
 from .label_mapping import LabelMapper, detect_label_mapping
 
@@ -100,7 +102,7 @@ class WeatherDataset(Dataset):
                 continue
 
             class_idx = self.label_mapper.encode(class_name)
-            for file_path in class_dir.iterdir():
+            for file_path in sorted(class_dir.iterdir()):
                 if not file_path.is_file():
                     continue
                 if file_path.suffix.lower() not in self.SUPPORTED_FORMATS:
@@ -207,6 +209,7 @@ class WeatherDataset(Dataset):
 
 def create_dataloaders(
     data_dir: Union[str, Path],
+    val_dir: Optional[Union[str, Path]] = None,
     label_mapper: Optional[LabelMapper] = None,
     train_transform: Optional[Callable] = None,
     val_transform: Optional[Callable] = None,
@@ -215,19 +218,24 @@ def create_dataloaders(
     val_split: float = 0.2,
     seed: int = 42,
     pin_memory: bool = True,
+    deduplicate: bool = True,
 ) -> Tuple[DataLoader, DataLoader, LabelMapper]:
     """Create training and validation DataLoaders.
 
     Args:
         data_dir: Root directory with class subdirectories.
+        val_dir: Optional explicit validation directory. If provided, no
+            auto-split is performed.
         label_mapper: Pre-built LabelMapper (auto-detected if None).
         train_transform: Transforms for training.
         val_transform: Transforms for validation.
         batch_size: Batch size.
         num_workers: Number of data loading workers.
-        val_split: Fraction of data for validation.
+        val_split: Fraction of data for validation when val_dir is not provided.
         seed: Random seed for reproducible split.
         pin_memory: Pin memory for faster GPU transfer.
+        deduplicate: Remove duplicate image content before splitting and remove
+            train samples that duplicate explicit validation images.
 
     Returns:
         (train_loader, val_loader, label_mapper)
@@ -236,25 +244,60 @@ def create_dataloaders(
     if label_mapper is None:
         label_mapper = detect_label_mapping(data_dir)
 
-    # Full dataset
-    full_dataset = WeatherDataset(
+    train_base = WeatherDataset(
         data_dir=data_dir,
         transform=None,  # We'll apply transforms per split
         label_mapper=label_mapper,
     )
 
-    # Stratified split
-    val_size = max(1, int(len(full_dataset) * val_split))
-    train_size = len(full_dataset) - val_size
+    if val_dir is not None:
+        val_base = WeatherDataset(
+            data_dir=val_dir,
+            transform=None,
+            label_mapper=label_mapper,
+        )
+        train_indices = list(range(len(train_base)))
+        val_indices = list(range(len(val_base)))
 
-    generator = torch.Generator().manual_seed(seed)
-    train_dataset, val_dataset = random_split(
-        full_dataset, [train_size, val_size], generator=generator
-    )
+        if deduplicate:
+            val_indices = _deduplicate_indices(val_base, split_name="val")
+            val_hashes = _hashes_for_indices(val_base, val_indices)
+            train_indices = _deduplicate_indices(
+                train_base,
+                split_name="train",
+                excluded_hashes=val_hashes,
+            )
 
-    # Apply transforms (via wrapper to avoid pickling issues)
-    train_dataset = _TransformWrapper(train_dataset, train_transform)
-    val_dataset = _TransformWrapper(val_dataset, val_transform)
+        train_dataset = _TransformWrapper(Subset(train_base, train_indices), train_transform)
+        val_dataset = _TransformWrapper(Subset(val_base, val_indices), val_transform)
+        train_size = len(train_dataset)
+        val_size = len(val_dataset)
+
+        logger.info(
+            f"Created dataloaders from explicit splits: train={train_size}, "
+            f"val={val_size}, val_dir={val_dir}"
+        )
+    else:
+        indices = list(range(len(train_base)))
+        if deduplicate:
+            indices = _deduplicate_indices(train_base, split_name="full")
+
+        train_indices, val_indices = _stratified_split_indices(
+            train_base,
+            indices=indices,
+            val_split=val_split,
+            seed=seed,
+        )
+
+        train_dataset = _TransformWrapper(Subset(train_base, train_indices), train_transform)
+        val_dataset = _TransformWrapper(Subset(train_base, val_indices), val_transform)
+        train_size = len(train_dataset)
+        val_size = len(val_dataset)
+
+        logger.info(
+            f"Created deduplicated stratified dataloaders: train={train_size}, "
+            f"val={val_size} (split={val_split:.0%}, seed={seed})"
+        )
 
     train_loader = DataLoader(
         train_dataset,
@@ -272,11 +315,113 @@ def create_dataloaders(
         pin_memory=pin_memory,
     )
 
-    logger.info(
-        f"Created dataloaders: train={train_size}, val={val_size} "
-        f"(split={val_split:.0%}, seed={seed})"
-    )
     return train_loader, val_loader, label_mapper
+
+
+def _file_sha256(path: Path) -> str:
+    """Return a content hash for an image file."""
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _deduplicate_indices(
+    dataset: WeatherDataset,
+    split_name: str,
+    excluded_hashes: Optional[set] = None,
+) -> List[int]:
+    """Keep one sample per content hash and optionally exclude known hashes.
+
+    Duplicate content can leak validation signal if one copy lands in train and
+    another lands in validation. This helper keeps the first copy in stable
+    dataset order and drops later copies.
+    """
+    excluded_hashes = excluded_hashes or set()
+    seen_hashes = set()
+    kept_indices: List[int] = []
+    dropped_duplicates = 0
+    dropped_excluded = 0
+    label_conflicts = 0
+    hash_to_label: Dict[str, int] = {}
+
+    for idx, (path, label_idx) in enumerate(dataset.images):
+        content_hash = _file_sha256(path)
+        if content_hash in excluded_hashes:
+            dropped_excluded += 1
+            continue
+        if content_hash in seen_hashes:
+            dropped_duplicates += 1
+            if hash_to_label.get(content_hash) != label_idx:
+                label_conflicts += 1
+            continue
+
+        seen_hashes.add(content_hash)
+        hash_to_label[content_hash] = label_idx
+        kept_indices.append(idx)
+
+    if dropped_duplicates or dropped_excluded or label_conflicts:
+        logger.warning(
+            "Deduplicated %s split: kept=%d, dropped_duplicates=%d, "
+            "dropped_cross_split=%d, label_conflicts=%d",
+            split_name,
+            len(kept_indices),
+            dropped_duplicates,
+            dropped_excluded,
+            label_conflicts,
+        )
+
+    return kept_indices
+
+
+def _hashes_for_indices(dataset: WeatherDataset, indices: Iterable[int]) -> set:
+    """Return content hashes for selected dataset indices."""
+    return {_file_sha256(dataset.images[idx][0]) for idx in indices}
+
+
+def _stratified_split_indices(
+    dataset: WeatherDataset,
+    indices: Sequence[int],
+    val_split: float,
+    seed: int,
+) -> Tuple[List[int], List[int]]:
+    """Split indices by class so validation preserves class proportions."""
+    if not 0 < val_split < 1:
+        raise ValueError(f"val_split must be between 0 and 1, got {val_split}")
+
+    generator = torch.Generator().manual_seed(seed)
+    by_label: Dict[int, List[int]] = defaultdict(list)
+    for idx in indices:
+        _, label_idx = dataset.images[idx]
+        by_label[label_idx].append(idx)
+
+    train_indices: List[int] = []
+    val_indices: List[int] = []
+    for label_idx in sorted(by_label):
+        class_indices = by_label[label_idx]
+        perm = torch.randperm(len(class_indices), generator=generator).tolist()
+        shuffled = [class_indices[i] for i in perm]
+        n_val = max(1, int(len(shuffled) * val_split)) if len(shuffled) > 1 else 1
+        n_val = min(n_val, len(shuffled))
+        val_indices.extend(shuffled[:n_val])
+        train_indices.extend(shuffled[n_val:])
+
+    train_counts = _class_counts_for_indices(dataset, train_indices)
+    val_counts = _class_counts_for_indices(dataset, val_indices)
+    logger.info("Stratified split train class counts: %s", train_counts)
+    logger.info("Stratified split val class counts: %s", val_counts)
+
+    return train_indices, val_indices
+
+
+def _class_counts_for_indices(dataset: WeatherDataset, indices: Sequence[int]) -> Dict[str, int]:
+    """Return class counts for a list of dataset indices."""
+    counts = Counter()
+    for idx in indices:
+        _, label_idx = dataset.images[idx]
+        counts[dataset.label_mapper.decode(label_idx)] += 1
+    return dict(counts)
 
 
 class _TransformWrapper(Dataset):
