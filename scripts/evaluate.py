@@ -145,7 +145,14 @@ def main():
     num_workers = args.num_workers
     if num_workers is None:
         num_workers = data_cfg.get("num_workers", 0)
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=num_workers)
+    mp_ctx = data_cfg.get("multiprocessing_context", "spawn") or None
+    mp_ctx = mp_ctx if num_workers > 0 else None
+    loader = DataLoader(
+        dataset, batch_size=args.batch_size, shuffle=False,
+        num_workers=num_workers,
+        persistent_workers=num_workers > 0,
+        multiprocessing_context=mp_ctx,
+    )
 
     # Run evaluation
     logger.info(f"Evaluating on {len(dataset)} images...")

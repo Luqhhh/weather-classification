@@ -219,6 +219,7 @@ def create_dataloaders(
     seed: int = 42,
     pin_memory: bool = True,
     deduplicate: bool = True,
+    multiprocessing_context: str = "spawn",
 ) -> Tuple[DataLoader, DataLoader, LabelMapper]:
     """Create training and validation DataLoaders.
 
@@ -231,11 +232,10 @@ def create_dataloaders(
         val_transform: Transforms for validation.
         batch_size: Batch size.
         num_workers: Number of data loading workers.
-        val_split: Fraction of data for validation when val_dir is not provided.
-        seed: Random seed for reproducible split.
-        pin_memory: Pin memory for faster GPU transfer.
         deduplicate: Remove duplicate image content before splitting and remove
             train samples that duplicate explicit validation images.
+        multiprocessing_context: '' for default (fork on Linux), 'spawn' to
+            avoid WSL2 deadlocks with num_workers > 0, 'fork', or 'forkserver'.
 
     Returns:
         (train_loader, val_loader, label_mapper)
@@ -299,6 +299,9 @@ def create_dataloaders(
             f"val={val_size} (split={val_split:.0%}, seed={seed})"
         )
 
+    # Only pass multiprocessing_context when num_workers > 0 (PyTorch constraint)
+    mp_context = multiprocessing_context or None if num_workers > 0 else None
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -306,6 +309,8 @@ def create_dataloaders(
         num_workers=num_workers,
         pin_memory=pin_memory,
         drop_last=True,
+        persistent_workers=num_workers > 0,
+        multiprocessing_context=mp_context,
     )
     val_loader = DataLoader(
         val_dataset,
@@ -313,6 +318,8 @@ def create_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=pin_memory,
+        persistent_workers=num_workers > 0,
+        multiprocessing_context=mp_context,
     )
 
     return train_loader, val_loader, label_mapper

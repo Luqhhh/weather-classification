@@ -242,6 +242,7 @@ def main():
         val_split=data_cfg.get("val_split", 0.2),
         seed=seed,
         pin_memory=data_cfg.get("pin_memory", True),
+        multiprocessing_context=data_cfg.get("multiprocessing_context", "spawn"),
     )
 
     # Create model
