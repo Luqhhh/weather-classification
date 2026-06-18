@@ -292,6 +292,8 @@ python scripts/train.py \
     --output_dir outputs/resnet18_baseline
 ```
 
+训练脚本默认 `--device auto`：检测到 CUDA 时使用 GPU，否则自动回退 CPU。需要强制 CPU 时加 `--device cpu`。
+
 训练输出（在 `outputs/resnet18_baseline/` 下）：
 - `best_model.pth` — 最佳 macro F1 权重
 - `checkpoints/` — Top-K 检查点
