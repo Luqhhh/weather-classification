@@ -223,7 +223,9 @@ def main():
     loss_fn = create_loss_function(
         name=loss_cfg.get("name", "cross_entropy"),
         num_classes=label_mapper.num_classes,
+        class_weights=loss_cfg.get("class_weights", None),
         label_smoothing=loss_cfg.get("label_smoothing", 0.0),
+        focal_gamma=loss_cfg.get("focal_gamma", 2.0),
     )
 
     # Create optimizer

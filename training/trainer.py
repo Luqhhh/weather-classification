@@ -66,7 +66,7 @@ class Trainer:
         self.model = model
         self.train_loader = train_loader
         self.val_loader = val_loader
-        self.criterion = criterion
+        self.criterion = criterion.to(device)
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.label_mapper = label_mapper
