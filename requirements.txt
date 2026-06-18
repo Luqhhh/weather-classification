@@ -1,6 +1,7 @@
 # Core
-torch>=2.0.0
-torchvision>=0.15.0
+# Competition runtime caps PyTorch at 2.1.7; keep upper bounds for submit compatibility.
+torch>=2.0.0,<=2.1.7
+torchvision>=0.15.0,<0.17.0
 numpy>=1.24.0
 pandas>=2.0.0
 Pillow>=9.5.0
