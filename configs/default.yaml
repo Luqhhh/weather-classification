@@ -4,7 +4,7 @@
 # ================== Data ==================
 data:
   train_dir: "data/train"
-  val_dir: null           # If null, auto-split from train
+  val_dir: "data/val"     # If null, auto-split from train with stratified dedup split
   test_dir: "data/test"
   val_split: 0.2          # Fraction of training data to use for validation
   num_workers: 0           # 0 = single-process (avoids WSL2 deadlocks)
