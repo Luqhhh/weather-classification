@@ -68,3 +68,8 @@ submit/*.tar.gz
 # Environment
 .env
 .env.local
+
+# Personal local notes
+personal_todo.md
+learning_route.md
+CLAUDE.md

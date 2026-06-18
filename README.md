@@ -194,6 +194,27 @@ weather-classification/
 
 ## 环境搭建
 
+### 比赛运行环境约束
+
+根据比赛方 Q&A A63，提交侧运行环境需要按以下资源约束设计：
+
+| 项目 | 约束 |
+| --- | --- |
+| PyTorch | 最高 `torch 2.1.7` |
+| 设备 | CPU only |
+| CPU | 2 核 |
+| 内存 | 8 GiB |
+| 推理时限 | 评分集总推理时间 ≤ 70 分钟 |
+
+因此，提交依赖必须限制在平台可用版本内。本仓库的 `requirements.txt` 和 `scripts/prepare_submission.py` 生成的 `submit/requirements.txt` 均应保持：
+
+```text
+torch>=2.0.0,<=2.1.7
+torchvision>=0.15.0,<0.17.0
+```
+
+注意：本地开发环境可以更高，但最终提交前必须在不超过 `torch 2.1.7` 的环境中做 smoke test。2 核 CPU / 8 GiB 内存意味着最终模型需要优先考虑 CPU 推理速度、batch size 和峰值内存，不能只看验证集 F1。
+
 ### 1. 创建虚拟环境
 
 ```bash
