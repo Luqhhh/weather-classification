@@ -18,7 +18,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torch.amp import autocast, GradScaler
+from torch.amp import autocast
+
+try:
+    from torch.amp import GradScaler
+except ImportError:
+    from torch.cuda.amp import GradScaler
 
 from .metrics import compute_metrics, MetricsTracker, plot_confusion_matrix
 from .callbacks import EarlyStopping, ModelCheckpoint, TrainingLogger
