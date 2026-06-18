@@ -7,7 +7,8 @@ data:
   val_dir: "data/val"     # If null, auto-split from train with stratified dedup split
   test_dir: "data/test"
   val_split: 0.2          # Fraction of training data to use for validation
-  num_workers: 0           # 0 = single-process (avoids WSL2 deadlocks)
+  num_workers: 4           # 0 = single-process; >0 uses spawn (avoids WSL2 deadlocks)
+  multiprocessing_context: "spawn"  # spawn = fresh subprocesses (safe for WSL2 / CUDA)
   pin_memory: false        # false = no benefit on CPU
 
   # Image preprocessing
