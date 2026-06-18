@@ -10,6 +10,7 @@ Usage:
 """
 
 import argparse
+import csv
 import logging
 import sys
 from pathlib import Path
@@ -124,20 +125,52 @@ def main():
     logger.info(f"Evaluating on {len(dataset)} images...")
     all_preds = []
     all_labels = []
+    all_confidences = []
 
     with torch.no_grad():
         from tqdm import tqdm
         for images, labels in tqdm(loader, desc="Evaluating"):
             images = images.to(args.device)
             logits = model(images)
-            preds = torch.argmax(logits, dim=1)
+            probs = torch.softmax(logits, dim=1)
+            preds = torch.argmax(probs, dim=1)
+            confs = probs[torch.arange(preds.size(0), device=preds.device), preds]
             all_preds.extend(preds.cpu().numpy().tolist())
             all_labels.extend(labels.numpy().tolist())
+            all_confidences.extend(confs.cpu().numpy().tolist())
 
     # Compute metrics
     y_true = np.array(all_labels)
     y_pred = np.array(all_preds)
     metrics = compute_metrics(y_true, y_pred, label_mapper.labels)
+
+    # Safety check: all collected arrays must match dataset length
+    n_images = len(dataset.images)
+    if not (len(all_preds) == len(all_labels) == len(all_confidences) == n_images):
+        raise RuntimeError(
+            f"Length mismatch after evaluation: "
+            f"dataset.images={n_images}, all_preds={len(all_preds)}, "
+            f"all_labels={len(all_labels)}, all_confidences={len(all_confidences)}"
+        )
+
+    # Collect error samples (misclassified images)
+    data_dir_path = Path(data_dir).resolve()
+    error_samples = []
+    for (img_path, true_idx), pred_idx, conf in zip(
+        dataset.images, all_preds, all_confidences
+    ):
+        if true_idx != pred_idx:
+            # Prefer relative path to data_dir; fall back to filename only
+            try:
+                rel_path = str(img_path.resolve().relative_to(data_dir_path))
+            except ValueError:
+                rel_path = img_path.name
+            error_samples.append({
+                "filename": rel_path,
+                "true_label": label_mapper.decode(true_idx),
+                "predicted_label": label_mapper.decode(pred_idx),
+                "confidence": round(conf, 4),
+            })
 
     # Print results
     print("\n" + "=" * 60)
@@ -168,6 +201,14 @@ def main():
         title=f"Confusion Matrix (Macro F1: {metrics['macro_f1']:.4f})",
     )
     logger.info(f"Confusion matrix saved to {output_dir}/confusion_matrix.png")
+
+    # Save error samples CSV
+    error_csv_path = output_dir / "error_samples.csv"
+    with open(error_csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["filename", "true_label", "predicted_label", "confidence"])
+        writer.writeheader()
+        writer.writerows(error_samples)
+    logger.info(f"Error samples saved to {error_csv_path} ({len(error_samples)} misclassified)")
 
 
 if __name__ == "__main__":
