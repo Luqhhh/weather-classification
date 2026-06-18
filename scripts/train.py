@@ -34,6 +34,9 @@ from training.losses import create_loss_function
 from training.callbacks import EarlyStopping, ModelCheckpoint, TrainingLogger
 from training.metrics import compute_macro_f1
 
+from experiment_tracking.tracker import ExperimentTracker
+from experiment_tracking.git_utils import capture_git_metadata
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -165,6 +168,22 @@ def main():
         "overrides", nargs="*",
         help="Config overrides in dot notation: --key.subkey value"
     )
+    parser.add_argument(
+        "--track", action="store_true", default=True,
+        help="Register experiment in tracking system (default: True)",
+    )
+    parser.add_argument(
+        "--no_track", action="store_false", dest="track",
+        help="Do NOT register experiment",
+    )
+    parser.add_argument(
+        "--notes", type=str, default="",
+        help="Experiment notes for the leaderboard",
+    )
+    parser.add_argument(
+        "--experiment_id", type=str, default=None,
+        help="Explicit experiment ID (auto-generated if not provided)",
+    )
     args = parser.parse_args()
     device = resolve_device(args.device)
 
@@ -259,6 +278,25 @@ def main():
     exp_name = config["logging"].get("experiment_name") or f"{model_cfg['name']}_{int(time.time())}"
     output_dir = Path(output_dir) / exp_name
 
+    # --- Save experiment metadata ---
+    import json as _json
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save config copy
+    import yaml as _yaml_lib
+    config_copy_path = output_dir / "config.yaml"
+    with open(config_copy_path, "w") as _f:
+        _yaml_lib.dump(config, _f, default_flow_style=False, allow_unicode=True)
+    logger.info(f"Config saved to {config_copy_path}")
+
+    # Save git metadata
+    git_meta = capture_git_metadata()
+    if git_meta["commit_hash"]:
+        with open(output_dir / "git_metadata.json", "w") as _f:
+            _json.dump(git_meta, _f, indent=2, ensure_ascii=False)
+        logger.info("Git metadata saved (branch=%s, commit=%s)",
+                     git_meta["branch"], git_meta["commit_hash"])
+
     # Callbacks
     early_stopping = EarlyStopping(
         patience=config["training"].get("early_stopping", {}).get("patience", 10),
@@ -313,6 +351,42 @@ def main():
     df = metrics_tracker.to_dataframe()
     df.to_csv(output_dir / "training_history.csv", index=False)
     logger.info(f"Training history saved to {output_dir}/training_history.csv")
+
+    # --- Register experiment for leaderboard ---
+    if args.track:
+        tracker = ExperimentTracker(output_dir)
+
+        # Build training summary from MetricsTracker
+        best_epoch_data = metrics_tracker.get_best_epoch()
+        training_summary = {
+            "best_epoch": best_epoch_data.get("epoch", -1) if best_epoch_data else -1,
+            "total_epochs": len(metrics_tracker.history),
+            "early_stopped": early_stopping.early_stop
+            if hasattr(early_stopping, "early_stop") else False,
+            "train_samples": len(train_loader.dataset),
+            "val_samples": len(val_loader.dataset),
+            "training_time_min": round(elapsed / 60, 1),
+            "best_val_macro_f1": (
+                best_epoch_data.get("val_macro_f1", 0)
+                if best_epoch_data else 0
+            ),
+            "best_val_accuracy": (
+                best_epoch_data.get("val_accuracy", 0)
+                if best_epoch_data else 0
+            ),
+        }
+
+        result = tracker.build_result(
+            config=config,
+            training_summary=training_summary,
+            notes=args.notes,
+            experiment_id=args.experiment_id,
+        )
+        tracker.save(result)
+        logger.info(
+            "Experiment registered (id=%s, best_f1=%s)",
+            result.experiment_id, result.val_macro_f1,
+        )
 
     # Copy best model to weights directory
     import shutil

@@ -26,6 +26,9 @@ from data.transforms import build_transforms
 from models.model_factory import create_model
 from training.metrics import compute_metrics, plot_confusion_matrix
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from experiment_tracking.tracker import ExperimentTracker
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -68,6 +71,22 @@ def main():
     parser.add_argument(
         "--num_workers", type=int, default=None,
         help="DataLoader workers for evaluation (defaults to config data.num_workers or 0)"
+    )
+    parser.add_argument(
+        "--experiment_id", type=str, default=None,
+        help="Experiment ID (e.g. exp_003). Auto-detected from output_dir name if omitted.",
+    )
+    parser.add_argument(
+        "--notes", type=str, default="",
+        help="Free-text notes for the experiment record",
+    )
+    parser.add_argument(
+        "--save_results", action="store_true", default=True,
+        help="Save structured results.json alongside other outputs (default: True)",
+    )
+    parser.add_argument(
+        "--no_save_results", action="store_false", dest="save_results",
+        help="Do NOT save results.json",
     )
     args = parser.parse_args()
 
@@ -216,6 +235,21 @@ def main():
         writer.writeheader()
         writer.writerows(error_samples)
     logger.info(f"Error samples saved to {error_csv_path} ({len(error_samples)} misclassified)")
+
+    # --- Save structured results.json ---
+    if args.save_results:
+        tracker = ExperimentTracker(output_dir)
+        result = tracker.build_result(
+            config=config,
+            evaluation_metrics=metrics,
+            notes=args.notes,
+            experiment_id=args.experiment_id,
+        )
+        tracker.save(result)
+        logger.info(
+            "Experiment result saved (id=%s, macro_f1=%s)",
+            result.experiment_id, result.val_macro_f1,
+        )
 
 
 if __name__ == "__main__":
