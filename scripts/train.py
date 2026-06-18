@@ -121,6 +121,21 @@ def _parse_override_value(val: str):
     return val
 
 
+def resolve_device(device: str) -> str:
+    """Resolve 'auto' to cuda when available, otherwise cpu."""
+    device = device.lower()
+    if device == "auto":
+        resolved = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Auto-selected device: {resolved}")
+        return resolved
+    if device == "cuda" and not torch.cuda.is_available():
+        logger.warning("CUDA requested but not available; falling back to CPU")
+        return "cpu"
+    if device not in {"cuda", "cpu"}:
+        raise ValueError(f"Unsupported device: {device}. Use 'auto', 'cuda', or 'cpu'.")
+    return device
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Train a weather image classification model"
@@ -142,14 +157,16 @@ def main():
         help="Path to label mapping JSON (auto-detected from data_dir if not provided)"
     )
     parser.add_argument(
-        "--device", type=str, default="cuda",
-        help="Device to train on: 'cuda' or 'cpu'"
+        "--device", type=str, default="auto",
+        choices=["auto", "cuda", "cpu"],
+        help="Device to train on: 'auto', 'cuda', or 'cpu'"
     )
     parser.add_argument(
         "overrides", nargs="*",
         help="Config overrides in dot notation: --key.subkey value"
     )
     args = parser.parse_args()
+    device = resolve_device(args.device)
 
     # Load config
     config = load_config(args.config)
@@ -265,8 +282,8 @@ def main():
         optimizer=optimizer,
         scheduler=scheduler,
         label_mapper=label_mapper,
-        device=args.device,
-        use_amp=(args.device == "cuda"),
+        device=device,
+        use_amp=(device == "cuda"),
         config=config,
     )
 
