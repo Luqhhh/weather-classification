@@ -1,0 +1,27 @@
+# EfficientNet-B2 configuration
+
+model:
+  name: "efficientnet_b2"
+  pretrained: true
+  dropout: 0.3
+
+data:
+  image_size: 224  # Phase 1 unified; native=260, deferred to Phase 2
+
+training:
+  batch_size: 64
+  epochs: 50
+  optimizer:
+    name: "adamw"
+    lr: 0.0001
+    weight_decay: 0.0001
+  scheduler:
+    name: "cosine"
+    warmup_epochs: 3
+    min_lr: 0.000001
+
+# Expected characteristics:
+#   Params: ~9.1M
+#   Weight size: ~35 MB
+#   CPU latency (260x260): ~30-35ms
+#   Best cost/performance in EfficientNet family for this task

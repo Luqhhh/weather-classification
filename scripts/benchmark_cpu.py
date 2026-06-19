@@ -104,10 +104,10 @@ def main():
     print(f"Throughput:      {results['optimal_throughput']} imgs/s")
     print(f"\nScoring estimate ({se['num_scoring_images']} images):")
     print(f"  Total time:    {se['estimated_total_time_min']} min")
-    print(f"  Within limit:  {'✅ YES' if se['within_70min'] else '❌ NO — optimize or use smaller model'}")
+    print(f"  Within limit:  {'[PASS] YES' if se['within_70min'] else '[FAIL] NO — optimize or use smaller model'}")
 
     if not se["within_70min"]:
-        print("\n⚠️  WARNING: Model is too slow for the 70-minute limit!")
+        print("\n[WARN] WARNING: Model is too slow for the 70-minute limit!")
         print("   Consider:")
         print("   1. Using a smaller model (MobileNetV3, EfficientNet-B0)")
         print("   2. Reducing input image size")

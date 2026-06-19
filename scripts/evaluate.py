@@ -98,7 +98,7 @@ def main():
     config = {}
     config_path = Path(args.config)
     if config_path.exists():
-        with open(config_path) as f:
+        with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
     model_cfg = config.get("model", {})
@@ -222,7 +222,7 @@ def main():
             f"{cls_metrics['support']:>8d}"
         )
     if metrics["weak_classes"]:
-        print(f"\n⚠️  Weak classes (below avg F1): {', '.join(metrics['weak_classes'])}")
+        print(f"\n[WEAK] Weak classes (below avg F1): {', '.join(metrics['weak_classes'])}")
     print("=" * 60)
 
     # Save confusion matrix

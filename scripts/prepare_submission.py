@@ -204,8 +204,9 @@ if __name__ == "__main__":
 
 SUBMIT_REQUIREMENTS = """# Weather Classification Inference Dependencies
 # Competition runtime caps PyTorch at 2.1.7.
-torch>=2.0.0,<=2.1.7
-torchvision>=0.15.0,<0.17.0
+# Team standard: torch 2.1.2 — locked to avoid version drift in PRs.
+torch==2.1.2
+torchvision==0.16.2
 numpy>=1.24.0,<2.0.0
 Pillow>=9.5.0
 """
