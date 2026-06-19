@@ -11,25 +11,27 @@
 | 1 | exp_ce_baseline | CE | cross_entropy | — | 同 exp_001，基线复核 |
 | 2 | exp_focal | FocalLoss | focal | gamma=2.0 | rainy recall ↑ |
 | 3 | exp_label_smoothing | LabelSmoothingCE | label_smoothing | smoothing=0.1 | cloudy/sunny 混淆 ↓ |
-| 4 | exp_weighted_ce | Weighted CE | cross_entropy | weights=[0.64,2.31,2.71,0.61] | rainy/snowy F1 ↑ |
-| 5 | exp_weighted_focal | Weighted FocalLoss | focal | gamma=2.0 + weights | 仅当 #2 或 #4 有收益时跑 |
+| 4 | exp_weighted_ce | Weighted CE | cross_entropy | sqrt weights=[0.80,1.52,1.65,0.78] | rainy/snowy F1 ↑ |
+| 5 | exp_weighted_focal | Weighted FocalLoss | focal | gamma=2.0 + sqrt weights | 仅当 #2 或 #4 有收益时跑 |
 
 ## 类别权重推导
 
-使用 balanced 公式 `total / (n_classes × count_per_class)`：
+使用 **sqrt 权重**（比 balanced 更保守，对数据集分布差异更鲁棒）：
 
 ```
+公式: w = sqrt(total / (n_classes × count_per_class))
+
 总数: cloudy=6640, rainy=1828, snowy=1562, sunny=6888 → total=16918
 
-cloudy: 16918 / (4 × 6640) = 0.637 → 0.64
-rainy:  16918 / (4 × 1828) = 2.314 → 2.31
-snowy:  16918 / (4 × 1562) = 2.707 → 2.71
-sunny:  16918 / (4 × 6888) = 0.614 → 0.61
+cloudy: sqrt(16918 / (4 × 6640)) = sqrt(0.637) = 0.798 → 0.80
+rainy:  sqrt(16918 / (4 × 1828)) = sqrt(2.314) = 1.521 → 1.52
+snowy:  sqrt(16918 / (4 × 1562)) = sqrt(2.708) = 1.646 → 1.65
+sunny:  sqrt(16918 / (4 × 6888)) = sqrt(0.614) = 0.784 → 0.78
 
-class_weights = [0.64, 2.31, 2.71, 0.61]   # order: cloudy, rainy, snowy, sunny
+class_weights = [0.80, 1.52, 1.65, 0.78]   # order: cloudy, rainy, snowy, sunny
 ```
 
-> ⚠ 权重顺序必须与 `label_mapper.labels` 一致。LabelMapper 按目录名字母序排列，确认顺序后再传。
+> 为什么选 sqrt 而不是 balanced：balanced 权重极差 4.2×，在我们数据上可能过拟合分布特征。sqrt 极差仅 2.1×，保留了 rainy/snowy > cloudy/sunny 的方向性，但数值更保守，换到比赛数据泛化风险更低。
 
 ## 共享配置
 
@@ -131,7 +133,7 @@ python scripts/train.py \
 
 ## exp_weighted_ce — Weighted CE
 
-**目的**：直接用类别权重补偿 rainy/snowy 的样本不足问题。rainy 权重 3.6× 于 sunny，snowy 权重 4.2×。
+**目的**：直接用类别权重补偿 rainy/snowy 的样本不足问题。使用 sqrt 权重（极差 2.1×），比 balanced 更保守，泛化风险更低。
 
 > ⚠ 先运行一次 `detect_label_mapping` 确认 label 顺序，否则权重对错类会有反效果。
 
@@ -144,16 +146,16 @@ python scripts/train.py \
   --config configs/models/resnet18.yaml \
   --data_dir data/train \
   --output_dir outputs \
-  --notes "Phase 1: Weighted CE, balanced weights [0.64,2.31,2.71,0.61]" \
+  --notes "Phase 1: Weighted CE, sqrt weights [0.80,1.52,1.65,0.78]" \
   -- \
   --training.loss.name cross_entropy \
-  --training.loss.class_weights [0.64,2.31,2.71,0.61]
+  --training.loss.class_weights [0.80,1.52,1.65,0.78]
 ```
 
 **预期效果**：
-- rainy F1 应显著提升（每个 rainy 样本 loss × 2.31）
-- snowy F1 应提升（每个 snowy 样本 loss × 2.71）
-- cloudy/sunny 可能轻微下降（权重被压低）
+- rainy F1 应提升（每个 rainy 样本 loss × 1.52）
+- snowy F1 应提升（每个 snowy 样本 loss × 1.65）
+- cloudy/sunny 轻微影响（权重 0.80/0.78，接近 1.0 不会过度牺牲）
 - 整体 macro F1 可能小幅提升
 
 **通过标准**：
@@ -174,11 +176,11 @@ python scripts/train.py \
   --config configs/models/resnet18.yaml \
   --data_dir data/train \
   --output_dir outputs \
-  --notes "Phase 1: Weighted FocalLoss gamma=2.0, balanced weights" \
+  --notes "Phase 1: Weighted FocalLoss gamma=2.0, sqrt weights" \
   -- \
   --training.loss.name focal \
   --training.loss.focal_gamma 2.0 \
-  --training.loss.class_weights [0.64,2.31,2.71,0.61]
+  --training.loss.class_weights [0.80,1.52,1.65,0.78]
 ```
 
 **通过标准**：
