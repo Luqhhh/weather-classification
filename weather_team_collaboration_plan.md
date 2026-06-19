@@ -138,32 +138,11 @@ exp_001_resnet18_ce_224
 
 ---
 
-## 4.3 Phase 1：backbone 初筛
+## 4.3 Phase 1：backbone 初筛 ✅ 已完成
 
-统一使用相同训练策略，先比较不同 backbone。
+统一使用相同训练策略，已完成 backbone 筛选。
 
-候选模型：
-
-- ResNet-18
-- ResNet-34
-- EfficientNet-B0
-- MobileNetV3-Small
-- ConvNeXt-Tiny
-
-统一配置建议：
-
-```yaml
-image_size: 224
-loss: cross_entropy
-dropout: 0.2
-augmentation: standard
-epochs: same_as_baseline
-batch_size: same_as_baseline
-optimizer: same_as_baseline
-learning_rate: same_as_baseline
-```
-
-Phase 1 的目标是筛选出 Top 1 或 Top 2 backbone，不要在这个阶段做大量超参组合。
+结果：**ConvNeXt-Tiny (0.9071) 与 EfficientNet-B1 (0.9014) 进入 Phase 2**。详见 `experiments/leaderboard.md` 子榜 A。
 
 ---
 
@@ -245,39 +224,19 @@ B 的重点是：
 
 ---
 
-## 5.2 Phase 1：loss 对比
+## 5.2 Phase 1：loss 对比 ✅ 已完成
 
-基于公共 baseline：
+基于 ResNet-18 + 224 + 标准增强，已完成 4 种 loss 对比（exp_010~013）。
 
-```text
-ResNet-18 + image_size=224 + 标准增强
-```
+结果：**LabelSmoothing ε=0.1 最优**（F1 0.8966，rainy 0.8649）。详见 `experiments/leaderboard.md` 子榜 B。
 
-比较以下 loss：
-
-- CrossEntropyLoss
-- FocalLoss，γ=2.0
-- LabelSmoothing
-- Weighted CrossEntropyLoss
-- Weighted FocalLoss，可选
-
-不要一开始就把所有 loss 混合使用。
-
-推荐顺序：
-
-```text
-先单独比较 loss
-再选择表现最好的 loss 与增强策略组合
-```
-
-重点观察：
-
-- Macro F1
-- rainy F1
-- snowy F1
-- cloudy F1 是否下降
-- sunny F1 是否下降
-- 训练是否稳定
+| 排名 | Loss | F1 | rainy F1 |
+|------|------|-----|----------|
+| 1 | LabelSmoothing | 0.8966 | 0.8649 |
+| 2 | FocalLoss γ=2.0 | 0.8847 | 0.8590 |
+| 3 | Weighted CE balanced | 0.8841 | 0.8522 |
+| 4 | Weighted CE sqrt | 0.8791 | 0.8409 |
+| — | CE baseline | 0.8708 | 0.8240 |
 
 ---
 
@@ -595,59 +554,31 @@ commit hash：
 
 ---
 
-# 10. 推荐执行节奏
+# 10. 当前进度与后续执行
 
-## Phase 1
+> 详细实验队列：`experiments/experiment_queue.md`
 
-目标：建立统一基线和评测闭环。
+## Phase 1 ✅ 已完成
 
-- A：跑 ResNet-18 baseline
-- B：准备 loss 实验配置
-- C：完善 evaluate、confusion matrix、leaderboard
+- **A**：Backbone 初筛完成（exp_001~009），ConvNeXt-Tiny (0.9071) + EfficientNet-B1 (0.9014) 进入下一阶段
+- **B**：Loss 对比完成（exp_010~013），LabelSmoothing ε=0.1 最优（0.8966）
+- **C**：Leaderboard + experiment_queue 已建立
 
-产出：
+## Phase 2 🔜 当前 — 三组可并行
 
-```text
-exp_001_resnet18_ce_224
-leaderboard.md 初版
-公共 baseline 配置
-```
+| 组 | 内容 | 数量 | 
+|----|------|------|
+| A | Top 2 backbone × 输入尺寸（256/320/384） | 5 |
+| B | 固定 LabelSmoothing，对比 Core Augmentation | 5 |
+| C | MixUp / CutMix + ConvNeXt 大尺寸 | 3 |
 
----
+## Phase 3 🔜
 
-## Phase 2
-
-目标：并行扩展实验。
-
-- A：跑 ResNet-34、EfficientNet-B0、MobileNetV3-Small、ConvNeXt-Tiny
-- B：跑 FocalLoss、LabelSmoothing、Weighted CE
-- C：CPU benchmark 脚本、错误样本分析脚本
-
-产出：
-
-```text
-backbone 初筛结果
-loss 初筛结果
-CPU benchmark 初版
-```
-
----
-
-## Phase 3
-
-目标：少量精调，不做无意义网格搜索。
-
-- A：对 Top 1 / Top 2 backbone 调 image size
-- B：固定最优 loss，对比增强策略
-- C：汇总 leaderboard，开始提交包冒烟测试
-
-产出：
-
-```text
-最优 image size
-最优 loss + augmentation 候选
-候选提交包初版
-```
+| 组 | 内容 | 数量 |
+|----|------|------|
+| A | — | 0 |
+| B | 最优 loss + 最优 augmentation 组合 | ≤3 |
+| C | ConvNeXt dropout 调优（0.2/0.4/0.5） | 3 |
 
 ---
 
