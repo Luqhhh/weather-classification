@@ -191,7 +191,7 @@ class CpuBenchmark:
         logger.info(f"    Model time: {se['estimated_model_time_min']} min")
         logger.info(f"    I/O time:   {se['estimated_io_time_min']} min")
         logger.info(f"    Total:      {se['estimated_total_time_min']} min")
-        logger.info(f"    Within 70min: {'✅ YES' if se['within_70min'] else '❌ NO — must optimize'}")
+        logger.info(f"    Within 70min: {'[PASS] YES' if se['within_70min'] else '[FAIL] NO — must optimize'}")
         logger.info("=" * 50)
 
     def save_csv(self, results: Dict, path: str) -> None:

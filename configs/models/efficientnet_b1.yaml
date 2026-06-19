@@ -1,0 +1,27 @@
+# EfficientNet-B1 configuration
+
+model:
+  name: "efficientnet_b1"
+  pretrained: true
+  dropout: 0.3
+
+data:
+  image_size: 224  # Phase 1 unified; native=240, deferred to Phase 2
+
+training:
+  batch_size: 64
+  epochs: 50
+  optimizer:
+    name: "adamw"
+    lr: 0.0001
+    weight_decay: 0.0001
+  scheduler:
+    name: "cosine"
+    warmup_epochs: 3
+    min_lr: 0.000001
+
+# Expected characteristics:
+#   Params: ~7.8M
+#   Weight size: ~30 MB
+#   CPU latency (240x240): ~20-25ms
+#   Good accuracy/speed balance, step up from B0

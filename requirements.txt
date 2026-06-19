@@ -1,7 +1,29 @@
-# Core
-# Competition runtime caps PyTorch at 2.1.7; keep upper bounds for submit compatibility.
-torch>=2.0.0,<=2.1.7
-torchvision>=0.15.0,<0.17.0
+# ================================================================
+# Weather Classification — Development Dependencies
+# ================================================================
+#
+# 团队统一版本：PyTorch 2.1.2+cu121
+# 这个版本是比赛平台的已知兼容版本，避免 PR 时频繁修改依赖文件。
+#
+# ==== 安装方式 ====
+#
+# 本地 GPU 训练（推荐）：
+#   pip install torch==2.1.2 torchvision==0.16.2 \
+#       --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirements.txt
+#
+# 或一键：
+#   pip install -r requirements-dev.txt
+#
+# ==== 版本对应关系 ====
+#   PyTorch 2.1.2  ←→  torchvision 0.16.2
+#   平台要求：torch <= 2.1.7（CPU 版本）
+#   训练环境：torch 2.1.2+cu121（CUDA 12.1）
+# ================================================================
+
+# Core — 锁定版本来避免团队间版本不一致
+# *** 注意：torch/torchvision 不在此处 pip install，请用上面的命令 ***
+# (pip 的 requirements.txt 无法表达 +cu121 后缀，需要 --index-url)
 numpy>=1.24.0,<2.0.0
 pandas>=2.0.0
 Pillow>=9.5.0

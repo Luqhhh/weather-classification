@@ -225,14 +225,22 @@ weather-classification/
 | 内存 | 8 GiB |
 | 推理时限 | 评分集总推理时间 ≤ 70 分钟 |
 
-因此，提交依赖必须限制在平台可用版本内。本仓库的 `requirements.txt` 和 `scripts/prepare_submission.py` 生成的 `submit/requirements.txt` 均应保持：
+### 团队统一版本
 
-```text
-torch>=2.0.0,<=2.1.7
-torchvision>=0.15.0,<0.17.0
-```
+为消除 PR 兼容性冲突，团队统一使用 **PyTorch 2.1.2**：
 
-注意：本地开发环境可以更高，但最终提交前必须在不超过 `torch 2.1.7` 的环境中做 smoke test。2 核 CPU / 8 GiB 内存意味着最终模型需要优先考虑 CPU 推理速度、batch size 和峰值内存，不能只看验证集 F1。
+| 场景 | 版本 | 安装方式 |
+|------|------|----------|
+| 开发训练 (GPU) | `torch 2.1.2+cu121` | `pip install -r requirements-dev.txt` |
+| 开发训练 (CPU) | `torch 2.1.2` | `pip install torch==2.1.2 torchvision==0.16.2 && pip install -r requirements.txt` |
+| 提交包 (CPU) | `torch 2.1.2` | 由 `prepare_submission.py` 自动生成 `submit/requirements.txt` |
+
+版本对应关系：
+- `torch 2.1.2` ↔ `torchvision 0.16.2`
+- 比赛平台最高支持 `torch 2.1.7`，`2.1.2` 在其范围内
+- 本地训练用 CUDA 版本加速，最终提交包用 CPU 版本
+
+注意：2 核 CPU / 8 GiB 内存意味着最终模型需要优先考虑 CPU 推理速度、batch size 和峰值内存，不能只看验证集 F1。
 
 ### 1. 创建虚拟环境
 
@@ -249,6 +257,11 @@ venv\Scripts\activate             # Windows
 ### 2. 安装依赖
 
 ```bash
+# GPU 训练（一键，推荐）：
+pip install -r requirements-dev.txt
+
+# 或 CPU only：
+pip install torch==2.1.2 torchvision==0.16.2
 pip install -r requirements.txt
 ```
 
@@ -256,6 +269,7 @@ pip install -r requirements.txt
 
 ```bash
 python -c "import torch; import torchvision; print(f'PyTorch {torch.__version__} ready, CUDA: {torch.cuda.is_available()}')"
+# 期望输出: PyTorch 2.1.2+cu121 ready, CUDA: True
 ```
 
 ### 4. 运行测试

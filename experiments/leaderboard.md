@@ -1,13 +1,19 @@
 # Experiments Leaderboard — Weather Image Classification
 
-> 更新日期：2026-06-17 | 排序：val_macro_f1 ↓
+> 更新日期：2026-06-18 | 排序：val_macro_f1 ↓
 
 ## 排行榜
 
 | # | Experiment | Model | Loss | Image Size | Aug | Val F1 | rainy F1 | Best Epoch | CPU Time | Weight |
 |---|-----------|-------|------|------------|-----|--------|----------|------------|----------|--------|
-| 1 | **exp_001** | ResNet-18 | CE | 224 | ✅ | **0.8708** | 0.8240 | 5 | 0.5 min ✅ | 42.6 MB |
-| 2 | **exp_002** | ResNet-18 | CE | 224 | ❌ | **0.8618** | 0.8231 | 7 | — | 42.6 MB |
+| 1 | **exp_008** | ConvNeXt-Tiny | CE | 224 | ✅ | **0.9071** 🥇 | 0.886 | 6 | 1.7 min ✅ | 106.1 MB |
+| 2 | **exp_005** | EfficientNet-B1 | CE | 224 | ✅ | **0.9014** 🥈 | 0.885 | 9 | 1.1 min ✅ | 24.9 MB |
+| 3 | **exp_003** | ResNet-34 | CE | 224 | ✅ | **0.9007** | 0.880 | 40 | 1.2 min ✅ | 81.2 MB |
+| 4 | **exp_004** | EfficientNet-B0 | CE | 224 | ✅ | **0.8963** | 0.865 | 8 | 0.8 min ✅ | 15.3 MB |
+| 5 | **exp_009** | ResNet-50 | CE | 224 | ✅ | **0.8916** | 0.855 | 5 | 1.7 min ✅ | 89.7 MB |
+| 6 | **exp_001** | ResNet-18 | CE | 224 | ✅ | **0.8708** | 0.8240 | 5 | 0.5 min ✅ | 42.6 MB |
+| 7 | **exp_002** | ResNet-18 | CE | 224 | ❌ | **0.8618** | 0.8231 | 7 | — | 42.6 MB |
+| 8 | **exp_007** | MobileNetV3-Small | CE | 224 | ✅ | **0.8173** ❌ | 0.752 | 1 | 0.3 min | 3.5 MB |
 
 ---
 
@@ -148,12 +154,33 @@ Per-class:
 
 增强贡献约 **+0.9% F1**，不算大但显著。主要价值是**抑制过拟合**（loss 稳定 vs 持续攀升）和**加速收敛**（快 2 epoch）。rainy 的瓶颈不是增强能解决的——两个实验 rainy F1 几乎一样，必须靠 FocalLoss 或类别权重。
 
+---
+## Phase 1 总结 (2026-06-19)
+
+**Top 2 进入 Phase 2：ConvNeXt-Tiny + EfficientNet-B1**
+
+| Exp | Model | Val F1 | rainy | snowy | cloudy | sunny | CPU(3000) | Weight | Batch | Epoch | Notes |
+|-----|-------|--------|-------|-------|--------|-------|-----------|--------|-------|-------|-------|
+| 008 | ConvNeXt-Tiny | 0.9071 | 0.886 | 0.932 | 0.893 | 0.917 | 1.7 min | 106 MB | 32 | 6 | 严重过拟合,需提 dropout |
+| 005 | EfficientNet-B1 | 0.9014 | 0.885 | 0.925 | 0.884 | 0.911 | 1.1 min | 25 MB | 16 | 9 | 64/32 均 OOM |
+| 003 | ResNet-34 | 0.9007 | 0.880 | — | — | — | 1.2 min | 81 MB | 64 | 40 | |
+| 004 | EfficientNet-B0 | 0.8963 | 0.865 | — | — | — | 0.8 min | 15 MB | 64 | 8 | |
+| 001 | ResNet-18 | 0.8708 | 0.824 | 0.893 | 0.868 | 0.899 | 0.5 min | 43 MB | 64 | 5 | Baseline |
+| 007 | MobileNetV3-Small | 0.8173 | 0.752 | 0.787 | — | — | 0.3 min | 4 MB | 64 | 1 | ❌ 淘汰; segfault |
+| — | EfficientNet-B2 | — | — | — | — | — | — | — | — | — | ⏭️ 跳过 |
+
+### 关键发现
+
+1. **ConvNeXt-Tiny 最强但过拟合严重** — loss 0.38→0.78，Phase 3 优先试 dropout 0.5
+2. **EfficientNet-B1 性价比最优** — F1 差 0.006，权重小 4×，CPU 快 35%
+3. **B0→B1 提升显著** — +0.005 F1, rainy +0.02
+4. **MobileNetV3 不可用** — F1<0.83 + segfault 崩溃
+
 ### 下一步
 
-- [ ] FocalLoss 补偿 rainy/snowy 少样本
-- [ ] 更大输入尺寸（256/320）看 rainy 是否改善
-- [ ] ConvNeXt-Tiny 和 EfficientNet 对比
-- [ ] 类别权重实验
+- [ ] Phase 2: Top 2 × 4 种输入尺寸
+- [ ] Phase 3: ConvNeXt dropout 优先 0.5
+- [ ] 如有余力补跑 B2
 
 ---
 

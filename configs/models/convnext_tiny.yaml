@@ -14,7 +14,7 @@ training:
   optimizer:
     name: "adamw"
     lr: 0.0001
-    weight_decay: 5e-2    # Higher weight decay for ConvNeXt
+    weight_decay: 0.05    # Higher weight decay for ConvNeXt
   scheduler:
     name: "cosine"
     warmup_epochs: 3

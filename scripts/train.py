@@ -54,12 +54,12 @@ def load_config(config_path: str) -> dict:
     default_path = Path("configs/default.yaml")
     config = {}
     if default_path.exists():
-        with open(default_path) as f:
+        with open(default_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
     else:
         logger.warning(f"Default config not found at {default_path}")
 
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         model_config = yaml.safe_load(f)
 
     # Deep merge (model config overrides defaults)
