@@ -84,9 +84,10 @@ python scripts/train.py \
   --config configs/models/resnet18.yaml \
   --data_dir data/train \
   --output_dir outputs \
+  --notes "Phase 1: FocalLoss gamma=2.0, no class weights" \
+  -- \
   --training.loss.name focal \
-  --training.loss.focal_gamma 2.0 \
-  --notes "Phase 1: FocalLoss gamma=2.0, no class weights"
+  --training.loss.focal_gamma 2.0
 ```
 
 **预期效果**：
@@ -110,9 +111,10 @@ python scripts/train.py \
   --config configs/models/resnet18.yaml \
   --data_dir data/train \
   --output_dir outputs \
+  --notes "Phase 1: LabelSmoothing epsilon=0.1" \
+  -- \
   --training.loss.name label_smoothing \
-  --training.loss.label_smoothing 0.1 \
-  --notes "Phase 1: LabelSmoothing epsilon=0.1"
+  --training.loss.label_smoothing 0.1
 ```
 
 **预期效果**：
@@ -142,9 +144,10 @@ python scripts/train.py \
   --config configs/models/resnet18.yaml \
   --data_dir data/train \
   --output_dir outputs \
+  --notes "Phase 1: Weighted CE, balanced weights [0.64,2.31,2.71,0.61]" \
+  -- \
   --training.loss.name cross_entropy \
-  --training.loss.class_weights [0.64,2.31,2.71,0.61] \
-  --notes "Phase 1: Weighted CE, balanced weights [0.64,2.31,2.71,0.61]"
+  --training.loss.class_weights [0.64,2.31,2.71,0.61]
 ```
 
 **预期效果**：
@@ -171,10 +174,11 @@ python scripts/train.py \
   --config configs/models/resnet18.yaml \
   --data_dir data/train \
   --output_dir outputs \
+  --notes "Phase 1: Weighted FocalLoss gamma=2.0, balanced weights" \
+  -- \
   --training.loss.name focal \
   --training.loss.focal_gamma 2.0 \
-  --training.loss.class_weights [0.64,2.31,2.71,0.61] \
-  --notes "Phase 1: Weighted FocalLoss gamma=2.0, balanced weights"
+  --training.loss.class_weights [0.64,2.31,2.71,0.61]
 ```
 
 **通过标准**：

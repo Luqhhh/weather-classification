@@ -46,6 +46,7 @@ outputs/*/
 !outputs/.gitkeep
 experiments/*/
 !experiments/.gitkeep
+!experiments/lqh/
 
 # Reports
 reports/*.csv
