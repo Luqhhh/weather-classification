@@ -30,11 +30,16 @@ data:
       hue: 0.05
     random_rotation:
       degrees: 10
-    # RandAugment — optional, enable for stronger augmentation
+    # RandAugment — automatic augmentation policy (replaces/supplements manual jitter+rotation)
+    # Set to a dict with num_ops (1-3) and magnitude (1-31) to enable:
+    #   rand_augment: {num_ops: 2, magnitude: 9}
     rand_augment: null
-    # MixUp / CutMix — optional
-    mixup_alpha: null      # e.g., 0.2
-    cutmix_alpha: null     # e.g., 1.0
+    # MixUp — pixel-level interpolation between two random images
+    # mixup_alpha: 0.2   # α→0 = no mixing; typical: 0.2 (mild), 0.4-1.0 (strong)
+    mixup_alpha: null
+    # CutMix — paste a random rectangular patch from one image onto another
+    # cutmix_alpha: 1.0  # typical: 0.5–1.0
+    cutmix_alpha: null
 
 # ================== Model ==================
 model:
@@ -61,6 +66,8 @@ training:
   loss:
     name: "cross_entropy"  # Options: cross_entropy, focal, label_smoothing
     label_smoothing: 0.1
+    # class_weights: [1.0, 1.2, 1.0, 0.8]   # per-class weights for imbalanced data
+    # focal_gamma: 2.0                       # focusing parameter (focal loss only)
   early_stopping:
     patience: 10
     min_delta: 0.001

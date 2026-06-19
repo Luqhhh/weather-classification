@@ -80,6 +80,18 @@ def get_train_transforms(
             )
         )
 
+    # --- RandAugment (optional, replaces / supplements manual augmentations) ---
+    # RandAugment randomly selects N augmentation ops and applies each at the
+    # given magnitude. Stronger regularization than hand-picked jitter+rotation
+    # — useful when the training set is small or classes are visually similar.
+    rand_aug_config = aug.get("rand_augment")
+    if rand_aug_config:
+        num_ops = rand_aug_config.get("num_ops", 2)
+        magnitude = rand_aug_config.get("magnitude", 9)
+        transform_list.append(
+            transforms.RandAugment(num_ops=num_ops, magnitude=magnitude)
+        )
+
     # --- Tensor conversion & normalization ---
     transform_list.append(transforms.ToTensor())
     transform_list.append(transforms.Normalize(mean=mean, std=std))

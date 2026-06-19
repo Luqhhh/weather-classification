@@ -10,6 +10,7 @@ Implements a full training pipeline:
 """
 
 import logging
+import random
 import time
 from pathlib import Path
 from typing import Dict, Optional
@@ -52,6 +53,8 @@ class Trainer:
         grad_accumulation_steps: int = 1,
         max_grad_norm: float = 1.0,
         config: Optional[Dict] = None,
+        mixup_alpha: float = 0.0,
+        cutmix_alpha: float = 0.0,
     ):
         """
         Args:
@@ -67,6 +70,8 @@ class Trainer:
             grad_accumulation_steps: Number of steps to accumulate gradients.
             max_grad_norm: Max gradient norm for clipping.
             config: Full training configuration dict.
+            mixup_alpha: Alpha parameter for MixUp (0 = disabled).
+            cutmix_alpha: Alpha parameter for CutMix (0 = disabled).
         """
         self.model = model
         self.train_loader = train_loader
@@ -80,6 +85,8 @@ class Trainer:
         self.grad_accumulation_steps = grad_accumulation_steps
         self.max_grad_norm = max_grad_norm
         self.config = config or {}
+        self.mixup_alpha = mixup_alpha
+        self.cutmix_alpha = cutmix_alpha
 
         self.scaler = GradScaler() if self.use_amp else None
         self.metrics_tracker: Optional[MetricsTracker] = None
@@ -204,6 +211,9 @@ class Trainer:
     def _train_epoch(self, epoch: int) -> float:
         """Run one training epoch.
 
+        Supports MixUp / CutMix batch-level augmentation when configured
+        via mixup_alpha / cutmix_alpha parameters.
+
         Returns:
             Average training loss.
         """
@@ -215,16 +225,33 @@ class Trainer:
             images = images.to(self.device)
             targets = targets.to(self.device)
 
+            # --- MixUp / CutMix ---
+            images, targets_a, targets_b, lam = self._maybe_apply_mixup_cutmix(images, targets)
+
+            # --- Forward pass ---
             if self.use_amp:
                 with autocast(device_type=self.device):
                     logits = self.model(images)
-                    loss = self.criterion(logits, targets)
+                    if targets_b is not None:
+                        # Mixed sample: loss is weighted sum over both labels
+                        loss = (
+                            lam * self.criterion(logits, targets_a)
+                            + (1 - lam) * self.criterion(logits, targets_b)
+                        )
+                    else:
+                        loss = self.criterion(logits, targets_a)
                     loss = loss / self.grad_accumulation_steps
 
                 self.scaler.scale(loss).backward()
             else:
                 logits = self.model(images)
-                loss = self.criterion(logits, targets)
+                if targets_b is not None:
+                    loss = (
+                        lam * self.criterion(logits, targets_a)
+                        + (1 - lam) * self.criterion(logits, targets_b)
+                    )
+                else:
+                    loss = self.criterion(logits, targets_a)
                 loss = loss / self.grad_accumulation_steps
                 loss.backward()
 
@@ -273,3 +300,104 @@ class Trainer:
 
         avg_loss = total_loss / len(self.val_loader)
         return avg_loss, all_y_true, all_y_pred
+
+    # ------------------------------------------------------------------
+    # MixUp / CutMix helpers
+    # ------------------------------------------------------------------
+
+    def _mixup(
+        self,
+        images: torch.Tensor,
+        targets: torch.Tensor,
+    ) -> tuple:
+        """MixUp augmentation: linearly interpolate two random samples.
+
+        Mixes images AND labels so the model learns smooth interpolations
+        between classes — acts as strong regularization.
+
+        λ ~ Beta(α, α);  mixed = λ·x_i + (1-λ)·x_j
+
+        Returns:
+            (mixed_images, targets_i, targets_j, lam)
+            Loss = lam * criterion(logits, targets_i)
+                 + (1-lam) * criterion(logits, targets_j)
+        """
+        alpha = self.mixup_alpha
+        lam = float(np.random.beta(alpha, alpha))
+        batch_size = images.size(0)
+        index = torch.randperm(batch_size, device=images.device)
+
+        mixed_images = lam * images + (1 - lam) * images[index]
+        return mixed_images, targets, targets[index], lam
+
+    def _cutmix(
+        self,
+        images: torch.Tensor,
+        targets: torch.Tensor,
+    ) -> tuple:
+        """CutMix augmentation: paste a rectangular patch from one image onto
+        another and mix labels proportionally to the patch area.
+
+        Better than MixUp for tasks where local spatial features matter
+        (weather textures, cloud patterns, etc.).
+
+        Returns:
+            (mixed_images, targets_orig, targets_patch, lam)
+            Loss = lam * criterion(logits, targets_orig)
+                 + (1-lam) * criterion(logits, targets_patch)
+            where lam = area of original image kept.
+        """
+        alpha = self.cutmix_alpha
+        lam = float(np.random.beta(alpha, alpha))
+        batch_size, _, H, W = images.shape
+        index = torch.randperm(batch_size, device=images.device)
+
+        # Random bounding box
+        cut_ratio = np.sqrt(1.0 - lam)
+        cut_h = max(1, int(H * cut_ratio))
+        cut_w = max(1, int(W * cut_ratio))
+        cy = np.random.randint(0, H)
+        cx = np.random.randint(0, W)
+
+        y1 = max(0, cy - cut_h // 2)
+        y2 = min(H, cy + cut_h // 2)
+        x1 = max(0, cx - cut_w // 2)
+        x2 = min(W, cx + cut_w // 2)
+
+        mixed_images = images.clone()
+        mixed_images[:, :, y1:y2, x1:x2] = images[index, :, y1:y2, x1:x2]
+
+        # λ = fraction of original image pixels retained
+        lam = 1.0 - ((y2 - y1) * (x2 - x1)) / (H * W)
+        return mixed_images, targets, targets[index], lam
+
+    def _maybe_apply_mixup_cutmix(
+        self,
+        images: torch.Tensor,
+        targets: torch.Tensor,
+    ) -> tuple:
+        """Apply MixUp or CutMix depending on config, or neither.
+
+        When both alphas are set, randomly chooses one per batch (50/50).
+
+        Returns:
+            (images, targets_or_targets_a, targets_b_or_None, lam_or_None)
+            When no mixing:     (images, targets, None, None)
+            When mixing active: (mixed_images, targets_a, targets_b, lam)
+        """
+        use_mixup = self.mixup_alpha and self.mixup_alpha > 0
+        use_cutmix = self.cutmix_alpha and self.cutmix_alpha > 0
+
+        if not use_mixup and not use_cutmix:
+            return images, targets, None, None
+
+        if use_mixup and use_cutmix:
+            # Randomly choose per batch
+            if random.random() < 0.5:
+                return self._mixup(images, targets)
+            else:
+                return self._cutmix(images, targets)
+        elif use_cutmix:
+            return self._cutmix(images, targets)
+        else:
+            return self._mixup(images, targets)

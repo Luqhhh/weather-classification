@@ -313,6 +313,7 @@ def main():
     logger_cb = TrainingLogger(log_file=str(output_dir / "training_log.jsonl"))
 
     # Trainer
+    aug_cfg = data_cfg.get("augmentation", {})
     trainer = Trainer(
         model=model,
         train_loader=train_loader,
@@ -324,6 +325,8 @@ def main():
         device=device,
         use_amp=(device == "cuda"),
         config=config,
+        mixup_alpha=aug_cfg.get("mixup_alpha") or 0.0,
+        cutmix_alpha=aug_cfg.get("cutmix_alpha") or 0.0,
     )
 
     # Train
