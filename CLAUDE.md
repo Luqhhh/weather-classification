@@ -2,6 +2,12 @@
 
 > 智海算法调优 / CAIP 强脑赛道 / 天气图片四分类
 
+## Work Rules
+
+1. **Training MUST use GPU** — 本机有 RTX 4070 (8GB, CUDA 12.6)，训练必须走 GPU，禁止 CPU 训练。
+2. **Commit 必须经过用户允许** — 提交前先展示改动内容，得到确认后再 commit。不自动提交。
+3. **禁止 Co-Authored-By** — commit message 中不要带 `Co-Authored-By: Claude <noreply@anthropic.com>`。
+
 ## Project Overview
 
 Weather image classification competition. 4-class output (cloudy, rainy, snowy, sunny) from phone-style photos. Macro F1 score. CPU-only inference within 70 minutes.
