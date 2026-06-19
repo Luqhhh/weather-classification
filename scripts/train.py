@@ -117,8 +117,9 @@ def _parse_override_value(val: str):
     # Try null
     if val.lower() in ("null", "none"):
         return None
-    # Try list
-    if val.startswith("[") and val.endswith("]"):
+    # Try list or dict (JSON)
+    if (val.startswith("[") and val.endswith("]")) or \
+       (val.startswith("{") and val.endswith("}")):
         import json
         return json.loads(val)
     return val

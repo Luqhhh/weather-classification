@@ -1,8 +1,8 @@
 # Experiment Queue — 剩余待做实验
 
-> 更新：2026-06-19 | 16 个待做，分 A/B/C 三组
+> 更新：2026-06-20 | 11 个待做，分 A/C 两组（B 组完成✅）
 
-## 已完成（exp_001 ~ exp_012）
+## 已完成（exp_001 ~ exp_018）
 
 | ID | Owner | Category | 描述 | 结果 |
 |----|-------|----------|------|------|
@@ -18,6 +18,11 @@
 | exp_011 | B | Loss | FocalLoss γ=2.0 | F1 0.8847 |
 | exp_012 | B | Loss | Weighted CE (sqrt) | F1 0.8791 |
 | exp_013 | B | Loss | Weighted CE (balanced) | F1 0.8841 |
+| exp_014 | B | Aug | No Aug (LabelSmoothing) | F1 0.8948 |
+| exp_015 | B | Aug | Light CJ (LabelSmoothing) | F1 0.8923 |
+| exp_016 | B | Aug | Medium CJ (LabelSmoothing) | F1 0.8890 |
+| exp_017 | B | Aug | Rotation 20° (LabelSmoothing) | F1 0.8864 |
+| exp_018 | B | Aug | RandAugment (LabelSmoothing) | F1 0.8841 |
 
 ## 运行中
 
@@ -90,6 +95,25 @@ Override 参数：
 
 所有 B 组实验共用：`-- --training.loss.name label_smoothing --training.loss.label_smoothing 0.1` + 上表参数
 
+### B 组结果总结 (2026-06-20)
+
+> 固定：ResNet-18 + LabelSmoothing ε=0.1 | 对照：exp_010（默认增强）F1 0.8966
+
+| ID | Augmentation | Val F1 | rainy F1 | Δ vs exp_010 | Best Epoch | 结论 |
+|----|-------------|--------|----------|--------------|------------|------|
+| exp_010 | Default (CJ 0.15, Rot 10°) | **0.8966** 🥇 | 0.8649 | — | 6 | 最优：保守增强最适配天气任务 |
+| exp_014 | No Aug | 0.8948 | 0.8585 | -0.2% | 14 | 增强贡献边际，主要用于防止过拟合 |
+| exp_015 | Light CJ | 0.8923 | 0.8628 | -0.4% | 6 | 太保守，rainy 略高但整体差 |
+| exp_016 | Medium CJ | 0.8890 | 0.8678 | -0.8% | 6 | 颜色扰动过强损害天气特征 |
+| exp_017 | Rotation 20° | 0.8864 | 0.8484 | -1.0% | 5 | 旋转过强破坏方向性天气特征 |
+| exp_018 | RandAugment | 0.8841 | 0.8510 | -1.3% | 4 | 自动化增强不如手工保守增强 |
+
+**关键发现**：
+1. **默认增强最优** — ColorJitter 0.15 + Rotation 10° 达到最佳平衡
+2. **增强虽贡献<1%** — 相比 No Aug (exp_014: 0.8948)，但显著抑制过拟合（No Aug 需 14 epochs 才收敛 vs 默认 6 epochs）
+3. **增强过强反而有害** — Rotation 20° (-1.0%) 和 RandAugment (-1.3%) 损害天气语义
+4. **B 组结论**：保持默认增强参数，不建议调大 Rotation 或引入 RandAugment
+
 ---
 
 ## C 组 — 高级增强 + Backbone 精调（exp_019, 020, 026~029，6 个）
@@ -124,20 +148,19 @@ Override 参数：
 
 ## 分组汇总
 
-| 组 | 内容 | 数量 | ID | 依赖 |
+| 组 | 内容 | 数量 | ID | 状态 |
 |----|------|------|-----|------|
-| A | 输入尺寸 (B1×3 + CNX×2) | 5 | exp_021~025 | 无 |
-| B | Core Augmentation | 5 | exp_014~018 | 无 |
+| A | 输入尺寸 (B1×3 + CNX×2) | 5 | exp_021~025 | 🔜 待做 |
+| B | Core Augmentation | 5 | exp_014~018 | ✅ 完成 |
 | C | 高级增强 (2) + CNX 精调 (4) | 6 | exp_019,020,026~029 | 026~029 依赖 A 结果 |
-| **合计** | | **16** | | |
+| **合计** | | **11 待做** | | |
 
 ## 执行顺序
 
 ```
-阶段 1 — 全部可并行（13 个，无依赖）
-  B: exp_014-018  ← 5 augmentation（ResNet-18 + LabelSmoothing）
-  C: exp_019-020  ← MixUp + CutMix（ResNet-18 + LabelSmoothing）
+阶段 1 — 全部可并行（11 个，无依赖）
   A: exp_021-026  ← 6 输入尺寸（B1×3 + CNX×3）
+  C: exp_019-020  ← MixUp + CutMix（ResNet-18 + LabelSmoothing）
 
 阶段 2 — 依赖 A 阶段 1 结果（3 个）
   C: exp_027-029  ← ConvNeXt dropout 0.2 / 0.4 / 0.5
