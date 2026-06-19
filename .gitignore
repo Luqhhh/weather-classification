@@ -71,5 +71,4 @@ submit/*.tar.gz
 .env.local
 
 # Personal local notes
-personal_todo.md
 learning_route.md
