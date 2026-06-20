@@ -1,6 +1,6 @@
 # Experiment Queue — 剩余待做实验
 
-> 更新：2026-06-20 | 11 个待做，分 A/C 两组（B 组完成✅）
+> 更新：2026-06-20 | 8 个待做，分 A/C 两组（B 组完成✅，C 组部分完成）
 
 ## 已完成（exp_001 ~ exp_018）
 
@@ -23,6 +23,9 @@
 | exp_016 | B | Aug | Medium CJ (LabelSmoothing) | F1 0.8890 |
 | exp_017 | B | Aug | Rotation 20° (LabelSmoothing) | F1 0.8864 |
 | exp_018 | B | Aug | RandAugment (LabelSmoothing) | F1 0.8841 |
+| exp_019 | C | Aug | MixUp α=0.2 + LabelSmoothing | F1 0.8912 |
+| exp_020 | C | Aug | CutMix α=1.0 + LabelSmoothing | F1 0.8968 |
+| exp_026 | C | Size | ConvNeXt-Tiny 384 + CE | F1 0.9000 |
 
 ## 运行中
 
@@ -160,6 +163,25 @@ Override 参数：
 | exp_026 | `--training.batch_size 32 -- --data.image_size 384` |
 | exp_027-029 | `--training.batch_size 32 -- --data.image_size {best_size} --model.dropout {0.2/0.4/0.5}` |
 
+### C 组结果总结 (2026-06-20)
+
+> exp_019/020：ResNet-18 + LabelSmoothing ε=0.1 | 对照：exp_010（默认增强）F1 0.8966
+> exp_026：ConvNeXt-Tiny 384 + CE | 对照：exp_008（CNX-224）F1 0.9071
+
+| ID | Aug/Size | Val F1 | rainy F1 | Δ vs 对照 | Best Epoch | 结论 |
+|----|----------|--------|----------|-----------|------------|------|
+| exp_010 | Default (对照) | **0.8966** | 0.8649 | — | 6 | B 组最优 baseline |
+| exp_019 | MixUp α=0.2 | 0.8912 | 0.858 | -0.54% | 23 | ❌ MixUp 反而降分，不利天气任务 |
+| exp_020 | CutMix α=1.0 | **0.8968** 🥇 | 0.863 | +0.02% | 23 | ✅ 追平 baseline，保留局部纹理有效 |
+| exp_008 | CNX-224 (对照) | **0.9071** | 0.886 | — | 6 | A 组 CNX 基线 |
+| exp_026 | CNX-384 | 0.9000 | 0.869 | -0.71% | 8 | ❌ 384 不如 224，过拟合更严重 |
+
+**关键发现**：
+1. **CutMix > MixUp** — CutMix α=1.0 追平 baseline（+0.02%），MixUp 反而 -0.54%。CutMix 保留局部纹理有利于天气特征，MixUp 的全局插值模糊了天气视觉线索
+2. **ConvNeXt-Tiny 384×384 不如 224×224** — 差距 -0.71%，更大输入导致更严重的过拟合（val loss 从 0.31 飙到 1.17）
+3. **bs=32 在 384×384 会爆 8GB 显存** — 96% VRAM 导致训练质量劣化，bs=16 才正常（epoch 1 F1: 0.8818 vs 0.8670）
+4. **C 组结论**：不推荐 MixUp；CutMix 无伤害但无显著收益；384 大输入无益。后续 exp_027~029 仍须等 A 组 best_size
+
 ---
 
 ## 分组汇总
@@ -168,15 +190,16 @@ Override 参数：
 |----|------|------|-----|------|
 | A | 输入尺寸 (B1×3 + CNX×2) | 5 | exp_021~025 | 🔜 待做 |
 | B | Core Augmentation | 5 | exp_014~018 | ✅ 完成 |
-| C | 高级增强 (2) + CNX 精调 (4) | 6 | exp_019,020,026~029 | 026~029 依赖 A 结果 |
-| **合计** | | **11 待做** | | |
+| C | 高级增强 (2) + CNX 精调 (4) | 6 | exp_019,020,026~029 | 🔶 exp_019/020/026 完成, 027~029 依赖 A |
+| **合计** | | **8 待做** | | |
 
 ## 执行顺序
 
 ```
-阶段 1 — 全部可并行（11 个，无依赖）
-  A: exp_021-026  ← 6 输入尺寸（B1×3 + CNX×3）
-  C: exp_019-020  ← MixUp + CutMix（ResNet-18 + LabelSmoothing）
+阶段 1 — 全部可并行（8 个）
+  A: exp_021-025  ← 5 输入尺寸（B1×3 + CNX×2）
+  C: exp_019-020  ← ✅ 完成（MixUp + CutMix）
+  C: exp_026       ← ✅ 完成（CNX-384）
 
 阶段 2 — 依赖 A 阶段 1 结果（3 个）
   C: exp_027-029  ← ConvNeXt dropout 0.2 / 0.4 / 0.5
