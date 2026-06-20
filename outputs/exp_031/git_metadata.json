@@ -1,0 +1,14 @@
+{
+  "branch": "main",
+  "commit_hash": "e0c1c119",
+  "commit_message": "exp30,exp31 added",
+  "dirty": true,
+  "dirty_files": [
+    "M outputs/exp_030/git_metadata.json",
+    "?? outputs/exp_030/confusion_matrix_final.png",
+    "?? outputs/exp_030/results.json",
+    "?? outputs/exp_030/training_history.csv",
+    "?? outputs/exp_030/training_log.jsonl",
+    "?? outputs/exp_031/"
+  ]
+}

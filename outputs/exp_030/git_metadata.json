@@ -1,10 +1,7 @@
 {
   "branch": "main",
-  "commit_hash": "ac0242b6",
-  "commit_message": "chore: update exp_025 results (ConvNeXt-Tiny 320px, F1=0.9106)",
-  "dirty": true,
-  "dirty_files": [
-    "M experiments/experiment_queue.md",
-    "?? outputs/exp_030/"
-  ]
+  "commit_hash": "e0c1c119",
+  "commit_message": "exp30,exp31 added",
+  "dirty": false,
+  "dirty_files": []
 }
