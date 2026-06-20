@@ -41,9 +41,13 @@ weights/*.onnx
 weights/*.ckpt
 !weights/.gitkeep
 
-# Outputs
-outputs/*/
+# Outputs — track experiment logs (small text), ignore model weights (large binary)
+outputs/*/best_model.pth
+outputs/*/*.pth
+outputs/*/checkpoints/
+# Keep .gitkeep and label_mapping.json trackable
 !outputs/.gitkeep
+!outputs/label_mapping.json
 experiments/*/
 !experiments/.gitkeep
 !experiments/lqh/

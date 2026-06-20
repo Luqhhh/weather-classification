@@ -1,0 +1,9 @@
+{
+  "branch": "main",
+  "commit_hash": "9f495749",
+  "commit_message": "merge: feature/experiment-updates — backbone screening, team version policy, Phase 2 plan",
+  "dirty": true,
+  "dirty_files": [
+    "M experiments/leaderboard.md"
+  ]
+}
