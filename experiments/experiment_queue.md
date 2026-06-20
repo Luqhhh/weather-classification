@@ -1,6 +1,6 @@
 # Experiment Queue — 剩余待做实验
 
-> 更新：2026-06-20 | 8 个待做，分 A/C 两组（B 组完成✅，C 组部分完成）
+> 更新：2026-06-20 | 5 个待做（A 组），C 组全部完成✅
 
 ## 已完成（exp_001 ~ exp_018）
 
@@ -14,6 +14,7 @@
 | exp_007 | A | Backbone | MobileNetV3-Small + CE | F1 0.8173 ❌ |
 | exp_008 | A | Backbone | ConvNeXt-Tiny + CE | F1 0.9071 |
 | exp_009 | A | Backbone | ResNet-50 + CE | F1 0.8916 |
+| exp_025 | A | Size | ConvNeXt-Tiny 320 + CE | F1 0.9106 |
 | exp_010 | B | Loss | LabelSmoothing ε=0.1 | F1 0.8966 ✅ 最优 |
 | exp_011 | B | Loss | FocalLoss γ=2.0 | F1 0.8847 |
 | exp_012 | B | Loss | Weighted CE (sqrt) | F1 0.8791 |
@@ -26,6 +27,9 @@
 | exp_019 | C | Aug | MixUp α=0.2 + LabelSmoothing | F1 0.8912 |
 | exp_020 | C | Aug | CutMix α=1.0 + LabelSmoothing | F1 0.8968 |
 | exp_026 | C | Size | ConvNeXt-Tiny 384 + CE | F1 0.9000 |
+| exp_027 | C | Dropout | CNX-Tiny 320 + CE + d=0.2 | F1 0.9097 |
+| exp_028 | C | Dropout | CNX-Tiny 320 + CE + d=0.4 | F1 0.9035 |
+| exp_029 | C | Dropout | CNX-Tiny 320 + CE + d=0.5 | F1 0.9075 |
 
 ## 运行中
 
@@ -43,7 +47,7 @@ early_stop: patience=10, min_delta=0.001
 
 ---
 
-## A 组 — Backbone 输入尺寸（exp_021 ~ exp_025，5 个）
+## A 组 — Backbone 输入尺寸（exp_021 ~ exp_025，5 个，exp_025 已完成✅）
 
 | 参数 | 值 |
 |------|-----|
@@ -60,7 +64,7 @@ early_stop: patience=10, min_delta=0.001
 | **exp_022** | `efficientnet_b1` | 320 | 更大输入，泛化可能提升 |
 | **exp_023** | `efficientnet_b1` | 384 | 最大尺寸，关注 CPU 时间 |
 | **exp_024** | `convnext_tiny` | 256 | 原生 224，细节提升 |
-| **exp_025** | `convnext_tiny` | 320 | 更大感受野 |
+| **exp_025** | `convnext_tiny` | 320 | ✅ F1 0.9106, epoch 43, 116 min |
 
 Override 参数：`-- --data.image_size {256/320/384}`
 
@@ -182,25 +186,41 @@ Override 参数：
 3. **bs=32 在 384×384 会爆 8GB 显存** — 96% VRAM 导致训练质量劣化，bs=16 才正常（epoch 1 F1: 0.8818 vs 0.8670）
 4. **C 组结论**：不推荐 MixUp；CutMix 无伤害但无显著收益；384 大输入无益。后续 exp_027~029 仍须等 A 组 best_size
 
+### C 组 Dropout 结果 (2026-06-20)
+
+> 固定：ConvNeXt-Tiny + CE + image_size=320 + batch_size=32 | 对照：exp_025 (d=0.3) F1 0.9106
+
+| ID | Dropout | Val F1 | rainy F1 | Δ vs d=0.3 | Best Epoch | Train Time | 结论 |
+|----|---------|--------|----------|------------|------------|------------|------|
+| exp_025 | **0.3** | **0.9106** 🥇 | — | — | — | — | ✅ 最优，原始设置即最佳 |
+| exp_027 | 0.2 | 0.9097 | 0.895 | -0.09% | 19 | 79.8 min | 接近但未超越，欠正则不致命 |
+| exp_029 | 0.5 | 0.9075 | 0.895 | -0.31% | 9 | ~53 min | 强正则，rainy 追平 d=0.2 |
+| exp_028 | 0.4 | 0.9035 | 0.881 | -0.71% | 5 | ~33 min | ❌ 过度正则化，收敛太快 |
+
+**关键发现**：
+1. **d=0.3 最优** — 原始设置就是 best，无需调整
+2. **d=0.2 几乎持平** — 差仅 0.09%，320×320 下轻微欠正则也可接受
+3. **d=0.4 最差** — F1 骤降 0.7%，epoch 5 即收敛，明显欠拟合
+4. **d=0.5 意外回升** — 比 d=0.4 好，但不如 d=0.3；rainy 0.895 优秀
+5. **C 组 dropout 结论**：保持 d=0.3，不建议调整
+
 ---
 
 ## 分组汇总
 
 | 组 | 内容 | 数量 | ID | 状态 |
 |----|------|------|-----|------|
-| A | 输入尺寸 (B1×3 + CNX×2) | 5 | exp_021~025 | 🔜 待做 |
+| A | 输入尺寸 (B1×3 + CNX×3) | 5 | exp_021~025 | 🔶 exp_025 完成, 021~024 待做 |
 | B | Core Augmentation | 5 | exp_014~018 | ✅ 完成 |
-| C | 高级增强 (2) + CNX 精调 (4) | 6 | exp_019,020,026~029 | 🔶 exp_019/020/026 完成, 027~029 依赖 A |
-| **合计** | | **8 待做** | | |
+| C | 高级增强 (2) + CNX 精调 (4) | 6 | exp_019,020,026~029 | ✅ 全部完成 |
+| **合计** | | **4 待做** | | |
 
 ## 执行顺序
 
 ```
-阶段 1 — 全部可并行（8 个）
+阶段 1 — A 组待做（5 个）
   A: exp_021-025  ← 5 输入尺寸（B1×3 + CNX×2）
-  C: exp_019-020  ← ✅ 完成（MixUp + CutMix）
-  C: exp_026       ← ✅ 完成（CNX-384）
 
-阶段 2 — 依赖 A 阶段 1 结果（3 个）
-  C: exp_027-029  ← ConvNeXt dropout 0.2 / 0.4 / 0.5
+B 组 ✅ 全部完成（exp_014~018）
+C 组 ✅ 全部完成（exp_019/020/026~029）
 ```
