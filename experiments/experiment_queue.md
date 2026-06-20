@@ -95,6 +95,22 @@ Override 参数：
 
 所有 B 组实验共用：`-- --training.loss.name label_smoothing --training.loss.label_smoothing 0.1` + 上表参数
 
+### B 组追加 — ConvNeXt LabelSmoothing（exp_030 ~ exp_031，2 个）
+
+> 固定：ConvNeXt-Tiny + image_size=320 + dropout=0.3 + 默认增强；对照：exp_025（CE, d=0.3, size=320）
+
+| ID | Loss | Dropout | 预期 |
+|----|------|---------|------|
+| **exp_030** | LabelSmoothing ε=0.05 | 0.3 | 温和抑制过拟合 |
+| **exp_031** | LabelSmoothing ε=0.1 | 0.3 | 对照 ResNet 最优设置 |
+
+Override 参数：
+
+| ID | 参数 |
+|----|------|
+| exp_030 | `-- --data.image_size 320 --training.batch_size 32 --training.loss.name label_smoothing --training.loss.label_smoothing 0.05 --model.dropout 0.3` |
+| exp_031 | `-- --data.image_size 320 --training.batch_size 32 --training.loss.name label_smoothing --training.loss.label_smoothing 0.1 --model.dropout 0.3` |
+
 ### B 组结果总结 (2026-06-20)
 
 > 固定：ResNet-18 + LabelSmoothing ε=0.1 | 对照：exp_010（默认增强）F1 0.8966
