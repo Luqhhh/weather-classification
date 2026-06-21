@@ -1,0 +1,12 @@
+{
+  "branch": "main",
+  "commit_hash": "3dc800fd",
+  "commit_message": "docs: reorganize experiment plan and outputs",
+  "dirty": true,
+  "dirty_files": [
+    "?? outputs/exp_034/",
+    "?? outputs/exp_035/",
+    "?? outputs/exp_039/",
+    "?? outputs/exp_040/"
+  ]
+}

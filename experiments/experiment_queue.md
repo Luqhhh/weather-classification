@@ -12,6 +12,7 @@
 | exp_031: ConvNeXt-Tiny 320 + LabelSmoothing 0.1 + d=0.3 | macro F1 0.9087 | 未超过 0.05，暂不优先 |
 | exp_023: EfficientNet-B1 384 + CE | macro F1 0.9045 | 可作为轻量 ensemble 互补模型 |
 | exp_024: ConvNeXt-Tiny 256 + CE | macro F1 0.9048 | 低于 320，不继续投入 256 路线 |
+| exp_039: ConvNeXt-Tiny 320 + CE + d=0.3 + wd=5e-4 | macro F1 0.9089 | B 组当前最佳；需补 seed 7/2026 后再和 exp_025 均值比较 |
 
 注意：`configs/models/convnext_tiny.yaml` 当前 `weight_decay=0.05`。下面的 `5e-4` 实验是**大幅降低 weight decay**，不是加强 weight decay；目的是验证当前 ConvNeXt 是否被过强 weight decay 限制。
 
@@ -89,6 +90,8 @@ Override 参数：
 | exp_038 | Dropout 中点 | d=0.25, wd=0.05, CE | 判断 0.2 与 0.3 之间是否有更稳点 |
 | exp_039 | 降低 weight decay | d=0.3, wd=5e-4, CE | 测试当前 0.05 是否压制学习 |
 | exp_040 | Dropout 中点 + 降低 weight decay | d=0.25, wd=5e-4, CE | 观察低 wd 是否需要更弱 dropout 配合 |
+| exp_048 | 复验 exp_039 | seed 7, d=0.3, wd=5e-4, CE | 与 exp_039 共同统计低 wd 配置 mean/std |
+| exp_049 | 复验 exp_039 | seed 2026, d=0.3, wd=5e-4, CE | 与 exp_039 共同统计低 wd 配置 mean/std |
 
 Override 参数：
 
@@ -97,12 +100,15 @@ Override 参数：
 | exp_038 | `--seed 42 --model.dropout 0.25 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.05` |
 | exp_039 | `--seed 42 --model.dropout 0.3 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.0005` |
 | exp_040 | `--seed 42 --model.dropout 0.25 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.0005` |
+| exp_048 | `--seed 7 --model.dropout 0.3 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.0005` |
+| exp_049 | `--seed 2026 --model.dropout 0.3 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.0005` |
 
 判定：
 
 - 若 `wd=5e-4` 的 val loss 明显下降且 F1 上升，后续以低 wd 为主线。
 - 若 `wd=5e-4` 训练 loss 下降但 val F1 不升，说明 0.05 的强正则仍有价值。
 - 若 `d=0.25` 超过 `d=0.2/0.3` 的 seed 均值，再进入多 seed 复验。
+- 若 `exp_039/048/049` 的 mean macro F1 领先 `exp_025/032/033` >= 0.002，则将低 weight decay 作为主线。
 
 ---
 
@@ -134,19 +140,29 @@ Override 参数：
 
 ## P4 — EMA / SWA 泛化实验
 
-目的：`exp_025` train loss 很低、val loss 很高，但 F1 仍第一。EMA / SWA 更适合先试，不再加重数据增强。
+目的：`exp_025` train loss 很低、val loss 很高，但 F1 仍第一。`exp_039` 降低 weight decay 后也表现接近主线。EMA / SWA 更适合先试，不再加重数据增强。
 
 | ID | 实验 | 参数 | 状态 |
 |----|------|------|------|
 | infra_001 | 增加 EMA 支持 | `training.ema.enabled`, `training.ema.decay` | 需先实现 |
 | exp_044 | EMA | 基于 exp_025，decay=0.999 | 依赖 infra_001 |
-| exp_045 | SWA / checkpoint averaging | 平均后期或 top-k checkpoints | 可优先做离线脚本 |
+| exp_045 | SWA / checkpoint averaging | 基于 exp_025，平均后期或 top-k checkpoints | 可优先做离线脚本 |
+| exp_050 | EMA | 基于 exp_039 配置，decay=0.999 | 依赖 infra_001 |
+| exp_051 | SWA / checkpoint averaging | 基于 exp_039，平均后期或 top-k checkpoints | 可优先做离线脚本 |
+
+EMA Override 参数：
+
+| ID | 参数 |
+|----|------|
+| exp_044 | `--seed 42 --model.dropout 0.3 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.05 --training.ema.enabled true --training.ema.decay 0.999` |
+| exp_050 | `--seed 42 --model.dropout 0.3 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.0005 --training.ema.enabled true --training.ema.decay 0.999` |
 
 建议实现顺序：
 
-1. 先做离线 checkpoint averaging：读取 `outputs/exp_025/checkpoints/` 的 top-k checkpoint，平均权重后评估。
-2. 如果 checkpoint averaging 有收益，再把 EMA 写进训练循环。
+1. 先做离线 checkpoint averaging：读取 `outputs/exp_025/checkpoints/` 和 `outputs/exp_039/checkpoints/` 的 top-k checkpoint，分别评估 `exp_045` 和 `exp_051`。
+2. 如果 checkpoint averaging 有收益，再把 EMA 写进训练循环，并跑 `exp_044` / `exp_050`。
 3. EMA/SWA 必须同时记录 macro F1、rainy F1、val loss 和 CPU 推理时间。
+4. `exp_044/045` 保留为 exp_025 路线；`exp_050/051` 用于验证 exp_039 低 weight decay 路线。
 
 判定：
 
@@ -178,10 +194,10 @@ Override 参数：
 ```text
 1. 先把 exp_024 / exp_030 / exp_031 结果纳入 leaderboard 和 results.csv
 2. 跑 P1 多 seed 复验：exp_032~037
-3. 若 P1 排名稳定，跑 P2：exp_038~040
+3. 若 P1 排名稳定，跑 P2：exp_038~040；若 exp_039 仍有竞争力，继续跑 exp_048~049
 4. 跑 P3 中可直接运行的 exp_041
 5. 若仍有提升空间，再实现 sampler / EMA / ensemble：
-   - infra_001 + exp_044/045
+   - infra_001 + exp_044/045 + exp_050/051
    - infra_002 + exp_046/047
 ```
 
@@ -191,8 +207,8 @@ Override 参数：
 |--------|----|------|
 | P0 | 汇总 exp_024 / exp_030 / exp_031 | 待做 |
 | P1 | exp_032~037 | 待跑 |
-| P2 | exp_038~040 | 待跑 |
+| P2 | exp_038~040, exp_048~049 | exp_038 待跑；exp_039~040 已有结果；exp_048~049 待跑 |
 | P3 | exp_041 | 待跑 |
 | P3+ | exp_042~043 | 需实现 sampler |
-| P4 | exp_044~045 | 需实现 EMA/SWA 或 checkpoint averaging |
+| P4 | exp_044~045, exp_050~051 | 需实现 EMA/SWA 或 checkpoint averaging |
 | P5 | exp_046~047 | 需实现 ensemble evaluate |
