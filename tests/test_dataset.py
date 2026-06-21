@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 import torch
 from PIL import Image
+from torch.utils.data import RandomSampler, SequentialSampler, WeightedRandomSampler
 
 from data.dataset import WeatherDataset, create_dataloaders
 from data.label_mapping import LabelMapper, detect_label_mapping, load_label_mapping, save_label_mapping
@@ -214,6 +215,155 @@ class TestWeatherDataset:
         assert all(path.name != "leaked_from_val.jpg" for path in train_paths)
         assert sum(path.name.startswith("val_cloudy") for path in val_paths) == 1
         assert _hashes(train_paths).isdisjoint(_hashes(val_paths))
+
+
+class TestSampler:
+    """Tests for class-balanced sampler in create_dataloaders."""
+
+    def test_default_no_sampler(self, tmp_path):
+        """Without sampler_config, DataLoader uses shuffle=True (RandomSampler)."""
+        for cls in ["cloudy", "rainy"]:
+            (tmp_path / cls).mkdir()
+            for i in range(5):
+                _save_image(tmp_path / cls / f"{cls}_{i}.jpg", color=(i * 10, 80, 120))
+
+        train_loader, _, _ = create_dataloaders(
+            data_dir=tmp_path,
+            batch_size=2,
+            num_workers=0,
+            val_split=0.2,
+            seed=42,
+        )
+        # Default: PyTorch creates a RandomSampler when shuffle=True
+        assert isinstance(train_loader.sampler, RandomSampler)
+        assert not isinstance(train_loader.sampler, WeightedRandomSampler)
+
+    def test_sampler_none_explicit(self, tmp_path):
+        """sampler_config name='none' keeps default shuffle behaviour."""
+        for cls in ["cloudy", "rainy"]:
+            (tmp_path / cls).mkdir()
+            for i in range(5):
+                _save_image(tmp_path / cls / f"{cls}_{i}.jpg", color=(i * 10, 80, 120))
+
+        train_loader, _, _ = create_dataloaders(
+            data_dir=tmp_path,
+            batch_size=2,
+            num_workers=0,
+            val_split=0.2,
+            seed=42,
+            sampler_config={"name": "none"},
+        )
+        assert isinstance(train_loader.sampler, RandomSampler)
+        assert not isinstance(train_loader.sampler, WeightedRandomSampler)
+
+    def test_sampler_config_none_does_not_affect(self, tmp_path):
+        """sampler_config=None behaves identically to not passing it."""
+        for cls in ["cloudy", "rainy"]:
+            (tmp_path / cls).mkdir()
+            for i in range(5):
+                _save_image(tmp_path / cls / f"{cls}_{i}.jpg", color=(i * 10, 80, 120))
+
+        train_loader, _, _ = create_dataloaders(
+            data_dir=tmp_path,
+            batch_size=2,
+            num_workers=0,
+            val_split=0.2,
+            seed=42,
+            sampler_config=None,
+        )
+        assert isinstance(train_loader.sampler, RandomSampler)
+        assert not isinstance(train_loader.sampler, WeightedRandomSampler)
+
+    def test_class_balanced_creates_weighted_random_sampler(self, tmp_path):
+        """class_balanced creates a WeightedRandomSampler on train_loader."""
+        for cls, base_color in [("cloudy", 80), ("rainy", 200)]:
+            (tmp_path / cls).mkdir()
+            n = 8 if cls == "cloudy" else 4  # imbalanced
+            for i in range(n):
+                _save_image(tmp_path / cls / f"{cls}_{i}.jpg", color=(i * 10, base_color, 120))
+
+        train_loader, val_loader, _ = create_dataloaders(
+            data_dir=tmp_path,
+            batch_size=2,
+            num_workers=0,
+            val_split=0.2,
+            seed=42,
+            sampler_config={"name": "class_balanced"},
+        )
+        # Verify train_loader has our sampler
+        assert isinstance(train_loader.sampler, WeightedRandomSampler)
+
+        # Validation loader must NOT be affected
+        assert not isinstance(val_loader.sampler, WeightedRandomSampler)
+
+        # Verify sample weights: fewer rainy → higher weight
+        sampler = train_loader.sampler
+        weights = sampler.weights
+        assert len(weights) > 0
+
+        # Get labels for each sample to verify weight ordering
+        train_dataset = train_loader.dataset
+        subset = train_dataset.subset  # _TransformWrapper.subset
+        base_dataset = subset.dataset  # Subset of WeatherDataset
+        labels = [base_dataset.images[idx][1] for idx in subset.indices]
+
+        # rainy has fewer samples → should get higher weight
+        # Find first sample of each class
+        cloudy_idx = next(i for i, lbl in enumerate(labels) if lbl == 0)
+        rainy_idx = next(i for i, lbl in enumerate(labels) if lbl == 1)
+        cloudy_weight = weights[cloudy_idx].item()
+        rainy_weight = weights[rainy_idx].item()
+        assert rainy_weight > cloudy_weight, (
+            f"rainy_weight={rainy_weight} should be > cloudy_weight={cloudy_weight}"
+        )
+
+    def test_class_balanced_sampler_not_random_sampler(self, tmp_path):
+        """When class_balanced is active, the internal sampler is our
+        WeightedRandomSampler, not PyTorch's default RandomSampler."""
+        for cls in ["cloudy", "rainy"]:
+            (tmp_path / cls).mkdir()
+            for i in range(5):
+                _save_image(tmp_path / cls / f"{cls}_{i}.jpg", color=(i * 10, 80, 120))
+
+        train_loader, _, _ = create_dataloaders(
+            data_dir=tmp_path,
+            batch_size=2,
+            num_workers=0,
+            val_split=0.2,
+            seed=42,
+            sampler_config={"name": "class_balanced"},
+        )
+        # Critical: our sampler is used, not PyTorch's RandomSampler
+        assert isinstance(train_loader.sampler, WeightedRandomSampler), (
+            "train_loader.sampler must be WeightedRandomSampler when "
+            "sampler_config.name='class_balanced'"
+        )
+        assert not isinstance(train_loader.sampler, RandomSampler)
+
+    def test_class_balanced_with_explicit_val_dir(self, tmp_path):
+        """Sampler works when val_dir is explicitly provided."""
+        train_dir = tmp_path / "train"
+        val_dir = tmp_path / "val"
+        for split_dir, base_color in [(train_dir, 80), (val_dir, 200)]:
+            for cls in ["cloudy", "rainy"]:
+                (split_dir / cls).mkdir(parents=True)
+                for i in range(5):
+                    _save_image(
+                        split_dir / cls / f"{cls}_{i}.jpg",
+                        color=(i * 10, base_color, 120),
+                    )
+
+        train_loader, val_loader, _ = create_dataloaders(
+            data_dir=train_dir,
+            val_dir=val_dir,
+            batch_size=2,
+            num_workers=0,
+            seed=42,
+            sampler_config={"name": "class_balanced"},
+        )
+        assert isinstance(train_loader.sampler, WeightedRandomSampler)
+        # val_loader unchanged
+        assert not isinstance(val_loader.sampler, WeightedRandomSampler)
 
 
 def _save_image(path: Path, color: tuple) -> None:

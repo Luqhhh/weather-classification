@@ -18,7 +18,7 @@ import hashlib
 
 import torch
 from PIL import Image, ImageFile
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader, Dataset, Subset, WeightedRandomSampler
 
 from .label_mapping import LabelMapper, detect_label_mapping
 
@@ -220,6 +220,7 @@ def create_dataloaders(
     pin_memory: bool = True,
     deduplicate: bool = True,
     multiprocessing_context: str = "spawn",
+    sampler_config: Optional[Dict] = None,
 ) -> Tuple[DataLoader, DataLoader, LabelMapper]:
     """Create training and validation DataLoaders.
 
@@ -232,10 +233,20 @@ def create_dataloaders(
         val_transform: Transforms for validation.
         batch_size: Batch size.
         num_workers: Number of data loading workers.
+        val_split: Fraction of training data to use for validation (when
+            val_dir is not provided).
+        seed: Random seed for train/val split and sampler reproducibility.
+        pin_memory: Pin memory for faster GPU transfer.
         deduplicate: Remove duplicate image content before splitting and remove
             train samples that duplicate explicit validation images.
         multiprocessing_context: '' for default (fork on Linux), 'spawn' to
             avoid WSL2 deadlocks with num_workers > 0, 'fork', or 'forkserver'.
+        sampler_config: Optional dict with keys ``name`` and sampler-specific
+            parameters.  ``name`` values:
+            - ``"none"`` or ``None``: no sampler, DataLoader uses ``shuffle=True``.
+            - ``"class_balanced"``: use ``WeightedRandomSampler`` with weights
+              computed as 1 / class-frequency on the training subset.
+            Default behaviour (``sampler_config=None``) is unchanged.
 
     Returns:
         (train_loader, val_loader, label_mapper)
@@ -302,10 +313,18 @@ def create_dataloaders(
     # Only pass multiprocessing_context when num_workers > 0 (PyTorch constraint)
     mp_context = multiprocessing_context or None if num_workers > 0 else None
 
+    # --- Sampler ---
+    train_sampler = _build_train_sampler(
+        train_dataset=train_dataset,
+        sampler_config=sampler_config,
+        seed=seed,
+    )
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=(train_sampler is None),
+        sampler=train_sampler,
         num_workers=num_workers,
         pin_memory=pin_memory,
         drop_last=True,
@@ -446,3 +465,93 @@ class _TransformWrapper(Dataset):
         if self.transform and isinstance(img, Image.Image):
             img = self.transform(img)
         return img, label
+
+
+def _build_train_sampler(
+    train_dataset: Dataset,
+    sampler_config: Optional[Dict],
+    seed: int,
+) -> Optional[WeightedRandomSampler]:
+    """Build a sampler for the training DataLoader.
+
+    Args:
+        train_dataset: Training dataset (may be a ``Subset`` wrapping a
+            ``WeatherDataset``).
+        sampler_config: Dict with ``name`` and optional parameters, or
+            ``None`` (default — no sampler).
+        seed: Random seed for sampler reproducibility.
+
+    Returns:
+        A ``WeightedRandomSampler`` instance, or ``None`` if no sampler
+        should be used.
+    """
+    if sampler_config is None:
+        return None
+
+    name = (sampler_config.get("name") or "none").lower()
+    if name == "none":
+        return None
+
+    # --- Resolve the underlying WeatherDataset ---
+    base_dataset = train_dataset
+    indices = None
+
+    # Unwrap _TransformWrapper (holds a .subset attribute)
+    if isinstance(base_dataset, _TransformWrapper):
+        base_dataset = base_dataset.subset
+
+    while isinstance(base_dataset, Subset):
+        indices = (
+            base_dataset.indices
+            if indices is None
+            else [indices[i] for i in base_dataset.indices]
+        )
+        base_dataset = base_dataset.dataset
+
+    if not isinstance(base_dataset, WeatherDataset):
+        raise TypeError(
+            "Sampler requires the underlying dataset to be a WeatherDataset, "
+            f"got {type(base_dataset)}"
+        )
+
+    # --- Build per-sample weights ---
+    if name == "class_balanced":
+        if indices is None:
+            indices = list(range(len(base_dataset)))
+
+        # Class counts on the *training* subset only
+        class_counts: Dict[int, int] = Counter()
+        sample_labels: List[int] = []
+        for idx in indices:
+            _, label_idx = base_dataset.images[idx]
+            class_counts[label_idx] += 1
+            sample_labels.append(label_idx)
+
+        # Weight = 1 / count (inverse frequency)
+        num_classes = len(class_counts)
+        class_weight = {
+            cls: 1.0 / max(count, 1) for cls, count in class_counts.items()
+        }
+
+        sample_weights = [class_weight[lbl] for lbl in sample_labels]
+
+        logger.info(
+            "Class-balanced sampler enabled: class_counts=%s, "
+            "class_weights={%s}, seed=%d",
+            dict(class_counts),
+            ", ".join(
+                f"{base_dataset.label_mapper.decode(cls)}: {w:.6f}"
+                for cls, w in sorted(class_weight.items())
+            ),
+            seed,
+        )
+
+        generator = torch.Generator().manual_seed(seed)
+        return WeightedRandomSampler(
+            weights=torch.tensor(sample_weights, dtype=torch.float64),
+            num_samples=len(sample_weights),
+            replacement=True,
+            generator=generator,
+        )
+
+    raise ValueError(f"Unknown sampler name: {name}")

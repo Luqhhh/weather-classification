@@ -244,6 +244,7 @@ def main():
         seed=seed,
         pin_memory=data_cfg.get("pin_memory", True),
         multiprocessing_context=data_cfg.get("multiprocessing_context", "spawn"),
+        sampler_config=config["training"].get("sampler"),
     )
 
     # Create model

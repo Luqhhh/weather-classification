@@ -75,6 +75,8 @@ training:
     save_top_k: 3
     monitor: "val_macro_f1"
     mode: "max"
+  sampler:
+    name: "none"            # Options: none, class_balanced
   ema:
     enabled: false
     decay: 0.999
