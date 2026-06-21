@@ -1,11 +1,11 @@
 {
-  "experiment_id": "efficientnet_b1_1781948750",
+  "experiment_id": "exp_021",
   "status": "registered",
-  "created_at": "2026-06-20T11:03:10.334065+00:00",
+  "created_at": "2026-06-20T08:01:46.332264+00:00",
   "branch": "feature/phase2-b1-sizes",
   "commit_hash": "ef5b9403",
   "model": "efficientnet_b1",
-  "image_size": "384",
+  "image_size": "256",
   "loss": "cross_entropy",
   "augmentation": "default",
   "dropout": "0.3",
@@ -23,11 +23,8 @@
     "branch": "feature/phase2-b1-sizes",
     "commit_hash": "ef5b9403",
     "commit_message": null,
-    "dirty": true,
-    "dirty_files": [
-      "M reports/confusion_matrix.png",
-      " M reports/results.json"
-    ]
+    "dirty": false,
+    "dirty_files": []
   },
   "config": {
     "data": {
@@ -38,7 +35,7 @@
       "num_workers": 2,
       "multiprocessing_context": "spawn",
       "pin_memory": false,
-      "image_size": 384,
+      "image_size": 256,
       "mean": [
         0.485,
         0.456,
@@ -130,14 +127,14 @@
     "seed": 42
   },
   "training": {
-    "best_epoch": 7,
-    "total_epochs": 18,
+    "best_epoch": 8,
+    "total_epochs": 19,
     "early_stopped": true,
     "train_samples": 16868,
     "val_samples": 4227,
-    "training_time_min": 77.3,
-    "best_val_macro_f1": 0.9045,
-    "best_val_accuracy": 0.9047
+    "training_time_min": 52.3,
+    "best_val_macro_f1": 0.9016,
+    "best_val_accuracy": 0.9016
   },
   "evaluation": {},
   "benchmark": {},

@@ -1,229 +1,198 @@
-# Experiment Queue — 剩余待做实验
+# Experiment Queue — ConvNeXt Generalization Plan
 
-> 更新：2026-06-21 | 1 个待做（A 组 exp_024），C 组全部完成✅
+> 更新：2026-06-21 | 目标：确认 Top 配置稳定性，并继续优化泛化与 rainy 类表现
 
-## 已完成
+## 当前结论
 
-| ID | Owner | Category | 描述 | 结果 |
-|----|-------|----------|------|------|
-| exp_001 | A | Backbone | ResNet-18 + CE baseline | F1 0.8708 |
-| exp_002 | A | Backbone | ResNet-18 + CE + NoAug | F1 0.8618 |
-| exp_003 | A | Backbone | ResNet-34 + CE | F1 0.9007 |
-| exp_004 | A | Backbone | EfficientNet-B0 + CE | F1 0.8963 |
-| exp_005 | A | Backbone | EfficientNet-B1 + CE | F1 0.9014 |
-| exp_007 | A | Backbone | MobileNetV3-Small + CE | F1 0.8173 ❌ |
-| exp_008 | A | Backbone | ConvNeXt-Tiny + CE | F1 0.9071 |
-| exp_009 | A | Backbone | ResNet-50 + CE | F1 0.8916 |
-| exp_021 | A | Size | EfficientNet-B1 256 + CE | F1 0.9016 |
-| exp_022 | A | Size | EfficientNet-B1 320 + CE | F1 0.9024 |
-| exp_023 | A | Size | EfficientNet-B1 384 + CE | F1 0.9045 ✅ B1 最优 |
-| exp_025 | A | Size | ConvNeXt-Tiny 320 + CE | F1 0.9106 |
-| exp_010 | B | Loss | LabelSmoothing ε=0.1 | F1 0.8966 ✅ 最优 |
-| exp_011 | B | Loss | FocalLoss γ=2.0 | F1 0.8847 |
-| exp_012 | B | Loss | Weighted CE (sqrt) | F1 0.8791 |
-| exp_013 | B | Loss | Weighted CE (balanced) | F1 0.8841 |
-| exp_014 | B | Aug | No Aug (LabelSmoothing) | F1 0.8948 |
-| exp_015 | B | Aug | Light CJ (LabelSmoothing) | F1 0.8923 |
-| exp_016 | B | Aug | Medium CJ (LabelSmoothing) | F1 0.8890 |
-| exp_017 | B | Aug | Rotation 20° (LabelSmoothing) | F1 0.8864 |
-| exp_018 | B | Aug | RandAugment (LabelSmoothing) | F1 0.8841 |
-| exp_019 | C | Aug | MixUp α=0.2 + LabelSmoothing | F1 0.8912 |
-| exp_020 | C | Aug | CutMix α=1.0 + LabelSmoothing | F1 0.8968 |
-| exp_026 | C | Size | ConvNeXt-Tiny 384 + CE | F1 0.9000 |
-| exp_027 | C | Dropout | CNX-Tiny 320 + CE + d=0.2 | F1 0.9097 |
-| exp_028 | C | Dropout | CNX-Tiny 320 + CE + d=0.4 | F1 0.9035 |
-| exp_029 | C | Dropout | CNX-Tiny 320 + CE + d=0.5 | F1 0.9075 |
+| 配置 | 关键结果 | 判断 |
+|------|----------|------|
+| exp_025: ConvNeXt-Tiny 320 + CE + d=0.3 | macro F1 0.9106 | 当前第一，作为主 baseline |
+| exp_027: ConvNeXt-Tiny 320 + CE + d=0.2 | macro F1 0.9097, rainy F1 0.895 | 与 exp_025 差距很小，需要多 seed 验证 |
+| exp_030: ConvNeXt-Tiny 320 + LabelSmoothing 0.05 + d=0.3 | macro F1 0.9087, rainy F1 0.8995 | 总分略低但 rainy 最强，值得组合验证 |
+| exp_031: ConvNeXt-Tiny 320 + LabelSmoothing 0.1 + d=0.3 | macro F1 0.9087 | 未超过 0.05，暂不优先 |
+| exp_023: EfficientNet-B1 384 + CE | macro F1 0.9045 | 可作为轻量 ensemble 互补模型 |
+| exp_024: ConvNeXt-Tiny 256 + CE | macro F1 0.9048 | 低于 320，不继续投入 256 路线 |
 
-## 运行中
+注意：`configs/models/convnext_tiny.yaml` 当前 `weight_decay=0.05`。下面的 `5e-4` 实验是**大幅降低 weight decay**，不是加强 weight decay；目的是验证当前 ConvNeXt 是否被过强 weight decay 限制。
 
-_无_
+## 统一运行约束
 
----
+| 项 | 值 |
+|----|----|
+| Base config | `configs/models/convnext_tiny.yaml` |
+| Image size | 320 |
+| Batch size | 32 |
+| Augmentation | 默认增强，不再加 RandAugment / MixUp / 强 Rotation |
+| Device | `auto`，最终仍需 CPU benchmark |
+| Primary metric | validation macro F1 |
+| Secondary metric | rainy F1、val loss、early stop epoch、CPU 推理时间 |
 
-## 共享凝固参数（三组通用）
+命令模板：
 
-```
-seed: 42           optimizer: adamw         lr: 0.0001
-weight_decay: 0.0001   scheduler: cosine (warmup 3)   epochs: 50
-early_stop: patience=10, min_delta=0.001
+```bash
+python3 scripts/train.py \
+  --config configs/models/convnext_tiny.yaml \
+  --output_dir outputs \
+  --experiment_id EXP_ID \
+  --notes "NOTES" \
+  -- \
+  --logging.experiment_name EXP_ID \
+  --data.image_size 320 \
+  --training.batch_size 32 \
+  ...
 ```
 
----
-
-## A 组 — Backbone 输入尺寸（exp_021 ~ exp_025，5 个，exp_021-023/025 已完成✅）
-
-| 参数 | 值 |
-|------|-----|
-| Config | `configs/models/efficientnet_b1.yaml` 或 `configs/models/convnext_tiny.yaml` |
-| Loss | CE（cross_entropy） |
-| Augmentation | 默认（ColorJitter 0.15, RRC 0.7-1.0, HFlip 0.5, Rotation 10°） |
-| Batch size | B1=16 / CNX=32（显存限制） |
-| Dropout | 0.3 |
-| 对照 | exp_005 (B1-224), exp_008 (CNX-224) 复用不重跑 |
-
-| ID | Config | Image Size | 结果/状态 |
-|----|--------|------------|-----------|
-| **exp_021** | `efficientnet_b1` | 256 | ✅ F1 0.9016, epoch 9, 52.3 min |
-| **exp_022** | `efficientnet_b1` | 320 | ✅ F1 0.9024, epoch 9, 53.6 min |
-| **exp_023** | `efficientnet_b1` | 384 | ✅ F1 0.9045, epoch 8, 77.3 min；B1 最优 size |
-| **exp_024** | `convnext_tiny` | 256 | 🔜 原生 224，细节提升 |
-| **exp_025** | `convnext_tiny` | 320 | ✅ F1 0.9106, epoch 43, 116 min |
-
-Override 参数：`-- --data.image_size {256/320/384}`
+`--experiment_id` 负责写入 tracking schema，`--logging.experiment_name` 负责固定输出目录为 `outputs/EXP_ID`。
 
 ---
 
-## B 组 — Core Augmentation（exp_014 ~ exp_018，5 个）
+## P1 — 多 seed 复验 Top 配置
 
-| 参数 | 值 |
-|------|-----|
-| Config | `configs/models/resnet18.yaml` |
-| Loss | **LabelSmoothing ε=0.1** |
-| Model | ResNet-18, pretrained, dropout=0.3 |
-| Batch size | 64 |
-| 对照 | exp_010（默认增强）复用不重跑 |
+目的：当前 Top 结果差距小于 0.2%，先确认排序不是随机波动。
 
-> 详细：`experiments/lqh/phase2_aug_spec.md`
+执行策略：复用已有 seed 42 结果作为第一个 seed；新增 seed 7 和 seed 2026。每个候选配置最终用 3 个 seed 统计 mean / std。
 
-| ID | 实验 | 改动 | 预期 |
+| ID | 复验对象 | Seed | 参数 | 结论标准 |
+|----|----------|------|------|----------|
+| exp_032 | exp_025 | 7 | CE, d=0.3, wd=0.05 | 与 seed 42 共同计算均值 |
+| exp_033 | exp_025 | 2026 | CE, d=0.3, wd=0.05 | 与 seed 42 共同计算均值 |
+| exp_034 | exp_027 | 7 | CE, d=0.2, wd=0.05 | 检查 d=0.2 是否稳定超过 d=0.3 |
+| exp_035 | exp_027 | 2026 | CE, d=0.2, wd=0.05 | 检查 d=0.2 是否稳定超过 d=0.3 |
+| exp_036 | exp_030 | 7 | LabelSmoothing 0.05, d=0.3, wd=0.05 | 检查 rainy 优势是否稳定 |
+| exp_037 | exp_030 | 2026 | LabelSmoothing 0.05, d=0.3, wd=0.05 | 检查 rainy 优势是否稳定 |
+
+Override 参数：
+
+| ID | 参数 |
+|----|------|
+| exp_032 | `--seed 7 --model.dropout 0.3 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.05` |
+| exp_033 | `--seed 2026 --model.dropout 0.3 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.05` |
+| exp_034 | `--seed 7 --model.dropout 0.2 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.05` |
+| exp_035 | `--seed 2026 --model.dropout 0.2 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.05` |
+| exp_036 | `--seed 7 --model.dropout 0.3 --training.loss.name label_smoothing --training.loss.label_smoothing 0.05 --training.optimizer.weight_decay 0.05` |
+| exp_037 | `--seed 2026 --model.dropout 0.3 --training.loss.name label_smoothing --training.loss.label_smoothing 0.05 --training.optimizer.weight_decay 0.05` |
+
+判定：
+
+- 若某配置 mean F1 领先 >= 0.002，直接进入下一阶段主线。
+- 若 mean F1 接近但 rainy F1 明显更高，保留作 ensemble 或 class-balanced 路线。
+- 若 std >= 0.003，后续所有结论必须用多 seed，不再用单次 F1 排名。
+
+---
+
+## P2 — ConvNeXt 320 窄范围正则化
+
+目的：在 `dropout=0.2/0.3` 附近做窄搜索，同时测试当前 `weight_decay=0.05` 是否过强。
+
+| ID | 实验 | 参数 | 预期 |
 |----|------|------|------|
-| **exp_014** | No Aug | 关闭所有增强：RRC scale=[1.0,1.0], HFlip prob=0, rotation=0, CJ all=0 | 测增强对 LabelSmoothing 的边际贡献 |
-| **exp_015** | Light CJ | brightness 0.05, contrast 0.05, saturation 0.05, hue 0.02 | 保守，保留颜色语义 |
-| **exp_016** | Medium CJ | 0.25 / 0.25 / 0.25 / 0.08 | 更强颜色扰动 |
-| **exp_017** | Rotation 20° | rotation 10 → 20 | 更大角度旋转 |
-| **exp_018** | RandAugment | `rand_augment: {num_ops: 2, magnitude: 9}` | 自动化增强策略 |
+| exp_038 | Dropout 中点 | d=0.25, wd=0.05, CE | 判断 0.2 与 0.3 之间是否有更稳点 |
+| exp_039 | 降低 weight decay | d=0.3, wd=5e-4, CE | 测试当前 0.05 是否压制学习 |
+| exp_040 | Dropout 中点 + 降低 weight decay | d=0.25, wd=5e-4, CE | 观察低 wd 是否需要更弱 dropout 配合 |
 
 Override 参数：
 
 | ID | 参数 |
 |----|------|
-| exp_014 | `--data.augmentation.random_resized_crop.scale [1.0,1.0] --data.augmentation.random_horizontal_flip.prob 0.0 --data.augmentation.random_rotation.degrees 0 --data.augmentation.color_jitter '{"brightness":0.0,"contrast":0.0,"saturation":0.0,"hue":0.0}'` |
-| exp_015 | `--data.augmentation.color_jitter.brightness 0.05 --data.augmentation.color_jitter.contrast 0.05 --data.augmentation.color_jitter.saturation 0.05 --data.augmentation.color_jitter.hue 0.02` |
-| exp_016 | `--data.augmentation.color_jitter.brightness 0.25 --data.augmentation.color_jitter.contrast 0.25 --data.augmentation.color_jitter.saturation 0.25 --data.augmentation.color_jitter.hue 0.08` |
-| exp_017 | `--data.augmentation.random_rotation.degrees 20` |
-| exp_018 | `--data.augmentation.rand_augment '{"num_ops":2,"magnitude":9}'` |
+| exp_038 | `--seed 42 --model.dropout 0.25 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.05` |
+| exp_039 | `--seed 42 --model.dropout 0.3 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.0005` |
+| exp_040 | `--seed 42 --model.dropout 0.25 --training.loss.name cross_entropy --training.optimizer.weight_decay 0.0005` |
 
-所有 B 组实验共用：`-- --training.loss.name label_smoothing --training.loss.label_smoothing 0.1` + 上表参数
+判定：
 
-### B 组追加 — ConvNeXt LabelSmoothing（exp_030 ~ exp_031，2 个）
-
-> 固定：ConvNeXt-Tiny + image_size=320 + dropout=0.3 + 默认增强；对照：exp_025（CE, d=0.3, size=320）
-
-| ID | Loss | Dropout | 预期 |
-|----|------|---------|------|
-| **exp_030** | LabelSmoothing ε=0.05 | 0.3 | 温和抑制过拟合 |
-| **exp_031** | LabelSmoothing ε=0.1 | 0.3 | 对照 ResNet 最优设置 |
-
-Override 参数：
-
-| ID | 参数 |
-|----|------|
-| exp_030 | `-- --data.image_size 320 --training.batch_size 32 --training.loss.name label_smoothing --training.loss.label_smoothing 0.05 --model.dropout 0.3` |
-| exp_031 | `-- --data.image_size 320 --training.batch_size 32 --training.loss.name label_smoothing --training.loss.label_smoothing 0.1 --model.dropout 0.3` |
-
-### B 组结果总结 (2026-06-20)
-
-> 固定：ResNet-18 + LabelSmoothing ε=0.1 | 对照：exp_010（默认增强）F1 0.8966
-
-| ID | Augmentation | Val F1 | rainy F1 | Δ vs exp_010 | Best Epoch | 结论 |
-|----|-------------|--------|----------|--------------|------------|------|
-| exp_010 | Default (CJ 0.15, Rot 10°) | **0.8966** 🥇 | 0.8649 | — | 6 | 最优：保守增强最适配天气任务 |
-| exp_014 | No Aug | 0.8948 | 0.8585 | -0.2% | 14 | 增强贡献边际，主要用于防止过拟合 |
-| exp_015 | Light CJ | 0.8923 | 0.8628 | -0.4% | 6 | 太保守，rainy 略高但整体差 |
-| exp_016 | Medium CJ | 0.8890 | 0.8678 | -0.8% | 6 | 颜色扰动过强损害天气特征 |
-| exp_017 | Rotation 20° | 0.8864 | 0.8484 | -1.0% | 5 | 旋转过强破坏方向性天气特征 |
-| exp_018 | RandAugment | 0.8841 | 0.8510 | -1.3% | 4 | 自动化增强不如手工保守增强 |
-
-**关键发现**：
-1. **默认增强最优** — ColorJitter 0.15 + Rotation 10° 达到最佳平衡
-2. **增强虽贡献<1%** — 相比 No Aug (exp_014: 0.8948)，但显著抑制过拟合（No Aug 需 14 epochs 才收敛 vs 默认 6 epochs）
-3. **增强过强反而有害** — Rotation 20° (-1.0%) 和 RandAugment (-1.3%) 损害天气语义
-4. **B 组结论**：保持默认增强参数，不建议调大 Rotation 或引入 RandAugment
+- 若 `wd=5e-4` 的 val loss 明显下降且 F1 上升，后续以低 wd 为主线。
+- 若 `wd=5e-4` 训练 loss 下降但 val F1 不升，说明 0.05 的强正则仍有价值。
+- 若 `d=0.25` 超过 `d=0.2/0.3` 的 seed 均值，再进入多 seed 复验。
 
 ---
 
-## C 组 — 高级增强 + Backbone 精调（exp_019, 020, 026~029，6 个）
+## P3 — 保 rainy 的 LabelSmoothing / Balanced 路线
 
-| 参数 | 值 |
-|------|-----|
-| Loss (019/020) | **LabelSmoothing ε=0.1** + ResNet-18 |
-| Loss (026~029) | CE + ConvNeXt-Tiny（A 组结果确定最优 size 后） |
-| Aug (019/020) | 默认增强 + MixUp/CutMix |
-| 对照 (019/020) | exp_010（默认增强无 MixUp） |
-| 对照 (026~029) | A 组最优 ConvNeXt + d=0.3 |
+目的：`exp_030` rainy F1 最高，但 macro F1 略低。尝试保住 rainy 增益，同时不牺牲整体排序。
 
-| ID | 实验 | 关键参数 | 预期 |
-|----|------|----------|------|
-| **exp_019** | MixUp | `mixup_alpha: 0.2` | 样本间平滑插值，改善 rainy 边界 |
-| **exp_020** | CutMix | `cutmix_alpha: 1.0` | 空间局部替换，保留纹理 |
-| **exp_026** | CNX + 384 | ConvNeXt-Tiny, image_size=384, dropout=0.3 | 最大输入，过拟合风险 |
-| **exp_027** | Dropout 0.2 | ConvNeXt + best_size, dropout=0.2 | 轻正则 |
-| **exp_028** | Dropout 0.4 | ConvNeXt + best_size, dropout=0.4 | 中等正则 |
-| **exp_029** | Dropout 0.5 | ConvNeXt + best_size, dropout=0.5 | 重正则，针对过拟合 |
+| ID | 实验 | 参数 | 状态 |
+|----|------|------|------|
+| exp_041 | Dropout 0.2 + LabelSmoothing 0.05 | d=0.2, LS=0.05, wd=0.05 | 可直接运行 |
+| exp_042 | CE + class-balanced sampler | d=0.3, CE, balanced sampler | 需先实现 sampler |
+| exp_043 | LS 0.05 + class-balanced sampler | d=0.2, LS=0.05, balanced sampler | 需先实现 sampler |
 
 Override 参数：
 
 | ID | 参数 |
 |----|------|
-| exp_019 | `-- --training.loss.name label_smoothing --training.loss.label_smoothing 0.1 --data.augmentation.mixup_alpha 0.2` |
-| exp_020 | `-- --training.loss.name label_smoothing --training.loss.label_smoothing 0.1 --data.augmentation.cutmix_alpha 1.0` |
-| exp_026 | `--training.batch_size 32 -- --data.image_size 384` |
-| exp_027-029 | `--training.batch_size 32 -- --data.image_size {best_size} --model.dropout {0.2/0.4/0.5}` |
+| exp_041 | `--seed 42 --model.dropout 0.2 --training.loss.name label_smoothing --training.loss.label_smoothing 0.05 --training.optimizer.weight_decay 0.05` |
+| exp_042 | `--seed 42 --model.dropout 0.3 --training.loss.name cross_entropy --training.sampler.name class_balanced` |
+| exp_043 | `--seed 42 --model.dropout 0.2 --training.loss.name label_smoothing --training.loss.label_smoothing 0.05 --training.sampler.name class_balanced` |
 
-### C 组结果总结 (2026-06-20)
+实现备注：
 
-> exp_019/020：ResNet-18 + LabelSmoothing ε=0.1 | 对照：exp_010（默认增强）F1 0.8966
-> exp_026：ConvNeXt-Tiny 384 + CE | 对照：exp_008（CNX-224）F1 0.9071
-
-| ID | Aug/Size | Val F1 | rainy F1 | Δ vs 对照 | Best Epoch | 结论 |
-|----|----------|--------|----------|-----------|------------|------|
-| exp_010 | Default (对照) | **0.8966** | 0.8649 | — | 6 | B 组最优 baseline |
-| exp_019 | MixUp α=0.2 | 0.8912 | 0.858 | -0.54% | 23 | ❌ MixUp 反而降分，不利天气任务 |
-| exp_020 | CutMix α=1.0 | **0.8968** 🥇 | 0.863 | +0.02% | 23 | ✅ 追平 baseline，保留局部纹理有效 |
-| exp_008 | CNX-224 (对照) | **0.9071** | 0.886 | — | 6 | A 组 CNX 基线 |
-| exp_026 | CNX-384 | 0.9000 | 0.869 | -0.71% | 8 | ❌ 384 不如 224，过拟合更严重 |
-
-**关键发现**：
-1. **CutMix > MixUp** — CutMix α=1.0 追平 baseline（+0.02%），MixUp 反而 -0.54%。CutMix 保留局部纹理有利于天气特征，MixUp 的全局插值模糊了天气视觉线索
-2. **ConvNeXt-Tiny 384×384 不如 224×224** — 差距 -0.71%，更大输入导致更严重的过拟合（val loss 从 0.31 飙到 1.17）
-3. **bs=32 在 384×384 会爆 8GB 显存** — 96% VRAM 导致训练质量劣化，bs=16 才正常（epoch 1 F1: 0.8818 vs 0.8670）
-4. **C 组结论**：不推荐 MixUp；CutMix 无伤害但无显著收益；384 大输入无益。后续 exp_027~029 仍须等 A 组 best_size
-
-### C 组 Dropout 结果 (2026-06-20)
-
-> 固定：ConvNeXt-Tiny + CE + image_size=320 + batch_size=32 | 对照：exp_025 (d=0.3) F1 0.9106
-
-| ID | Dropout | Val F1 | rainy F1 | Δ vs d=0.3 | Best Epoch | Train Time | 结论 |
-|----|---------|--------|----------|------------|------------|------------|------|
-| exp_025 | **0.3** | **0.9106** 🥇 | — | — | — | — | ✅ 最优，原始设置即最佳 |
-| exp_027 | 0.2 | 0.9097 | 0.895 | -0.09% | 19 | 79.8 min | 接近但未超越，欠正则不致命 |
-| exp_029 | 0.5 | 0.9075 | 0.895 | -0.31% | 9 | ~53 min | 强正则，rainy 追平 d=0.2 |
-| exp_028 | 0.4 | 0.9035 | 0.881 | -0.71% | 5 | ~33 min | ❌ 过度正则化，收敛太快 |
-
-**关键发现**：
-1. **d=0.3 最优** — 原始设置就是 best，无需调整
-2. **d=0.2 几乎持平** — 差仅 0.09%，320×320 下轻微欠正则也可接受
-3. **d=0.4 最差** — F1 骤降 0.7%，epoch 5 即收敛，明显欠拟合
-4. **d=0.5 意外回升** — 比 d=0.4 好，但不如 d=0.3；rainy 0.895 优秀
-5. **C 组 dropout 结论**：保持 d=0.3，不建议调整
+- 当前训练代码支持 `training.loss.class_weights`，但没有发现 `class-balanced sampler` 配置。
+- 若短期不想改 dataloader，可先用 `--training.loss.class_weights [...]` 做 proxy；但它不等价于 sampler。
+- sampler 路线只在 rainy recall / rainy F1 明显提升且 macro F1 不掉超过 0.001 时继续。
 
 ---
 
-## 分组汇总
+## P4 — EMA / SWA 泛化实验
 
-| 组 | 内容 | 数量 | ID | 状态 |
-|----|------|------|-----|------|
-| A | 输入尺寸 (B1×3 + CNX×2) | 5 | exp_021~025 | 🔶 exp_021-023/025 完成, exp_024 待做 |
-| B | Core Augmentation | 5 | exp_014~018 | ✅ 完成 |
-| C | 高级增强 (2) + CNX 精调 (4) | 6 | exp_019,020,026~029 | ✅ 全部完成 |
-| **合计** | | **1 待做** | | |
+目的：`exp_025` train loss 很低、val loss 很高，但 F1 仍第一。EMA / SWA 更适合先试，不再加重数据增强。
+
+| ID | 实验 | 参数 | 状态 |
+|----|------|------|------|
+| infra_001 | 增加 EMA 支持 | `training.ema.enabled`, `training.ema.decay` | 需先实现 |
+| exp_044 | EMA | 基于 exp_025，decay=0.999 | 依赖 infra_001 |
+| exp_045 | SWA / checkpoint averaging | 平均后期或 top-k checkpoints | 可优先做离线脚本 |
+
+建议实现顺序：
+
+1. 先做离线 checkpoint averaging：读取 `outputs/exp_025/checkpoints/` 的 top-k checkpoint，平均权重后评估。
+2. 如果 checkpoint averaging 有收益，再把 EMA 写进训练循环。
+3. EMA/SWA 必须同时记录 macro F1、rainy F1、val loss 和 CPU 推理时间。
+
+判定：
+
+- F1 提升 >= 0.001 且 val loss 下降，进入多 seed 复验。
+- 只降 val loss 但 F1 不升，保留为泛化备选，不替换主模型。
+
+---
+
+## P5 — 轻量 Ensemble
+
+目的：在不继续训练大量模型的情况下，测试互补性和最终提交上限。
+
+| ID | Ensemble | 组成 | 状态 |
+|----|----------|------|------|
+| infra_002 | 增加 ensemble evaluate 脚本 | 支持多个 checkpoint logits 平均 | 需先实现 |
+| exp_046 | ConvNeXt CE + ConvNeXt LS | exp_025 + exp_030 | 依赖 infra_002 |
+| exp_047 | ConvNeXt + EfficientNet-B1 | exp_025 + exp_023 | 依赖 infra_002 |
+
+判定：
+
+- ensemble F1 提升 >= 0.002 才值得进入最终方案。
+- CPU 推理时间必须重新测；若超过预算，只保留为分析参考。
+- 若 `exp_030` 只提升 rainy 但拖累其他类，可尝试按类别或按权重调整 logits：`0.7 * exp_025 + 0.3 * exp_030`。
+
+---
 
 ## 执行顺序
 
+```text
+1. 先把 exp_024 / exp_030 / exp_031 结果纳入 leaderboard 和 results.csv
+2. 跑 P1 多 seed 复验：exp_032~037
+3. 若 P1 排名稳定，跑 P2：exp_038~040
+4. 跑 P3 中可直接运行的 exp_041
+5. 若仍有提升空间，再实现 sampler / EMA / ensemble：
+   - infra_001 + exp_044/045
+   - infra_002 + exp_046/047
 ```
-阶段 1 — A 组待做（1 个）
-  A: exp_024  ← ConvNeXt-Tiny 256
 
-B 组 ✅ 全部完成（exp_014~018）
-C 组 ✅ 全部完成（exp_019/020/026~029）
-```
+## 当前待做清单
+
+| 优先级 | ID | 状态 |
+|--------|----|------|
+| P0 | 汇总 exp_024 / exp_030 / exp_031 | 待做 |
+| P1 | exp_032~037 | 待跑 |
+| P2 | exp_038~040 | 待跑 |
+| P3 | exp_041 | 待跑 |
+| P3+ | exp_042~043 | 需实现 sampler |
+| P4 | exp_044~045 | 需实现 EMA/SWA 或 checkpoint averaging |
+| P5 | exp_046~047 | 需实现 ensemble evaluate |
