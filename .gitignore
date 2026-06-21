@@ -51,6 +51,9 @@ outputs/*/checkpoints/
 experiments/*/
 !experiments/.gitkeep
 !experiments/lqh/
+!experiments/exp_021*/
+!experiments/exp_022*/
+!experiments/exp_023*/
 
 # Reports
 reports/*.csv
