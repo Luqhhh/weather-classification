@@ -1,8 +1,8 @@
 # Experiment Queue — 剩余待做实验
 
-> 更新：2026-06-20 | 5 个待做（A 组），C 组全部完成✅
+> 更新：2026-06-21 | 1 个待做（A 组 exp_024），C 组全部完成✅
 
-## 已完成（exp_001 ~ exp_018）
+## 已完成
 
 | ID | Owner | Category | 描述 | 结果 |
 |----|-------|----------|------|------|
@@ -14,6 +14,9 @@
 | exp_007 | A | Backbone | MobileNetV3-Small + CE | F1 0.8173 ❌ |
 | exp_008 | A | Backbone | ConvNeXt-Tiny + CE | F1 0.9071 |
 | exp_009 | A | Backbone | ResNet-50 + CE | F1 0.8916 |
+| exp_021 | A | Size | EfficientNet-B1 256 + CE | F1 0.9016 |
+| exp_022 | A | Size | EfficientNet-B1 320 + CE | F1 0.9024 |
+| exp_023 | A | Size | EfficientNet-B1 384 + CE | F1 0.9045 ✅ B1 最优 |
 | exp_025 | A | Size | ConvNeXt-Tiny 320 + CE | F1 0.9106 |
 | exp_010 | B | Loss | LabelSmoothing ε=0.1 | F1 0.8966 ✅ 最优 |
 | exp_011 | B | Loss | FocalLoss γ=2.0 | F1 0.8847 |
@@ -47,7 +50,7 @@ early_stop: patience=10, min_delta=0.001
 
 ---
 
-## A 组 — Backbone 输入尺寸（exp_021 ~ exp_025，5 个，exp_025 已完成✅）
+## A 组 — Backbone 输入尺寸（exp_021 ~ exp_025，5 个，exp_021-023/025 已完成✅）
 
 | 参数 | 值 |
 |------|-----|
@@ -58,12 +61,12 @@ early_stop: patience=10, min_delta=0.001
 | Dropout | 0.3 |
 | 对照 | exp_005 (B1-224), exp_008 (CNX-224) 复用不重跑 |
 
-| ID | Config | Image Size | 预期 |
-|----|--------|------------|------|
-| **exp_021** | `efficientnet_b1` | 256 | 原生 240，256 提升感受野 |
-| **exp_022** | `efficientnet_b1` | 320 | 更大输入，泛化可能提升 |
-| **exp_023** | `efficientnet_b1` | 384 | 最大尺寸，关注 CPU 时间 |
-| **exp_024** | `convnext_tiny` | 256 | 原生 224，细节提升 |
+| ID | Config | Image Size | 结果/状态 |
+|----|--------|------------|-----------|
+| **exp_021** | `efficientnet_b1` | 256 | ✅ F1 0.9016, epoch 9, 52.3 min |
+| **exp_022** | `efficientnet_b1` | 320 | ✅ F1 0.9024, epoch 9, 53.6 min |
+| **exp_023** | `efficientnet_b1` | 384 | ✅ F1 0.9045, epoch 8, 77.3 min；B1 最优 size |
+| **exp_024** | `convnext_tiny` | 256 | 🔜 原生 224，细节提升 |
 | **exp_025** | `convnext_tiny` | 320 | ✅ F1 0.9106, epoch 43, 116 min |
 
 Override 参数：`-- --data.image_size {256/320/384}`
@@ -210,16 +213,16 @@ Override 参数：
 
 | 组 | 内容 | 数量 | ID | 状态 |
 |----|------|------|-----|------|
-| A | 输入尺寸 (B1×3 + CNX×3) | 5 | exp_021~025 | 🔶 exp_025 完成, 021~024 待做 |
+| A | 输入尺寸 (B1×3 + CNX×2) | 5 | exp_021~025 | 🔶 exp_021-023/025 完成, exp_024 待做 |
 | B | Core Augmentation | 5 | exp_014~018 | ✅ 完成 |
 | C | 高级增强 (2) + CNX 精调 (4) | 6 | exp_019,020,026~029 | ✅ 全部完成 |
-| **合计** | | **4 待做** | | |
+| **合计** | | **1 待做** | | |
 
 ## 执行顺序
 
 ```
-阶段 1 — A 组待做（5 个）
-  A: exp_021-025  ← 5 输入尺寸（B1×3 + CNX×2）
+阶段 1 — A 组待做（1 个）
+  A: exp_024  ← ConvNeXt-Tiny 256
 
 B 组 ✅ 全部完成（exp_014~018）
 C 组 ✅ 全部完成（exp_019/020/026~029）

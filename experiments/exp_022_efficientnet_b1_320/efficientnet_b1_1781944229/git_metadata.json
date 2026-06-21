@@ -1,0 +1,10 @@
+{
+  "branch": "feature/phase2-b1-sizes",
+  "commit_hash": "ef5b9403",
+  "commit_message": null,
+  "dirty": true,
+  "dirty_files": [
+    "M reports/confusion_matrix.png",
+    " M reports/results.json"
+  ]
+}

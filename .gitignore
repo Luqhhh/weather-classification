@@ -51,6 +51,12 @@ outputs/*/checkpoints/
 experiments/*/
 !experiments/.gitkeep
 !experiments/lqh/
+!experiments/exp_021*/
+!experiments/exp_022*/
+!experiments/exp_023*/
+# Block large binary files inside tracked experiment dirs
+experiments/exp_*/*/best_model.pth
+experiments/exp_*/*/checkpoints/
 
 # Reports
 reports/*.csv
