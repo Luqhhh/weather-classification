@@ -144,11 +144,12 @@ Override 参数：
 
 | ID | 实验 | 参数 | 状态 |
 |----|------|------|------|
-| infra_001 | 增加 EMA 支持 | `training.ema.enabled`, `training.ema.decay` | 需先实现 |
+| infra_001 | 增加 EMA 支持 | `training.ema.enabled`, `training.ema.decay` | 已实现 |
 | exp_044 | EMA | 基于 exp_025，decay=0.999 | 依赖 infra_001 |
-| exp_045 | SWA / checkpoint averaging | 基于 exp_025，平均后期或 top-k checkpoints | 可优先做离线脚本 |
-| exp_050 | EMA | 基于 exp_039 配置，decay=0.999 | 依赖 infra_001 |
-| exp_051 | SWA / checkpoint averaging | 基于 exp_039，平均后期或 top-k checkpoints | 可优先做离线脚本 |
+| exp_045 | SWA / checkpoint averaging | 基于 exp_025，平均 top-k checkpoints | 已完成：macro F1 0.9102，rainy F1 0.8956 |
+| exp_050 | EMA | 基于 exp_039 配置，decay=0.999 | 已完成：macro F1 0.9155，rainy F1 0.8952 |
+| exp_051 | SWA / checkpoint averaging | 基于 exp_039，平均 top-k checkpoints | 已完成：macro F1 0.9158，rainy F1 0.8966 |
+| exp_053 | exp_051 消融 | 仅平均 exp_039 后期 epoch 5/6 checkpoints | 已完成：macro F1 0.9120，rainy F1 0.8896 |
 
 EMA Override 参数：
 
@@ -177,9 +178,10 @@ EMA Override 参数：
 
 | ID | Ensemble | 组成 | 状态 |
 |----|----------|------|------|
-| infra_002 | 增加 ensemble evaluate 脚本 | 支持多个 checkpoint logits 平均 | 需先实现 |
-| exp_046 | ConvNeXt CE + ConvNeXt LS | exp_025 + exp_030 | 依赖 infra_002 |
+| infra_002 | 增加 ensemble evaluate 脚本 | 支持多个 checkpoint logits 平均 | 已实现 |
+| exp_046 | ConvNeXt CE + ConvNeXt LS | exp_025 + exp_030 | 已完成：macro F1 0.9106，rainy F1 0.8966 |
 | exp_047 | ConvNeXt + EfficientNet-B1 | exp_025 + exp_023 | 依赖 infra_002 |
+| exp_052 | 当前最佳 + LS ensemble | exp_051 + exp_030 | 已完成：macro F1 0.9159，rainy F1 0.9056 |
 
 判定：
 
@@ -207,8 +209,8 @@ EMA Override 参数：
 |--------|----|------|
 | P0 | 汇总 exp_024 / exp_030 / exp_031 | 待做 |
 | P1 | exp_032~037 | 待跑 |
-| P2 | exp_038~040, exp_048~049 | exp_038 待跑；exp_039~040 已有结果；exp_048~049 待跑 |
+| P2 | exp_038~040, exp_048~049 | exp_038 待跑；exp_039~040、exp_048~049 已有结果 |
 | P3 | exp_041 | 待跑 |
 | P3+ | exp_042~043 | 需实现 sampler |
-| P4 | exp_044~045, exp_050~051 | 需实现 EMA/SWA 或 checkpoint averaging |
-| P5 | exp_046~047 | 需实现 ensemble evaluate |
+| P4 | exp_044~045, exp_050~051 | EMA/checkpoint averaging 已实现；exp_045/050/051/053 已完成 |
+| P5 | exp_046~047 | ensemble evaluate 已实现；exp_046/052 已完成；exp_047 可选 |

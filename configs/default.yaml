@@ -75,6 +75,9 @@ training:
     save_top_k: 3
     monitor: "val_macro_f1"
     mode: "max"
+  ema:
+    enabled: false
+    decay: 0.999
 
 # ================== Inference ==================
 inference:

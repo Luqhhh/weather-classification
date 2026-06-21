@@ -9,6 +9,7 @@ Implements a full training pipeline:
 - Checkpointing and early stopping
 """
 
+import copy
 import logging
 import random
 import time
@@ -93,6 +94,9 @@ class Trainer:
 
         # Move model to device
         self.model = self.model.to(device)
+        self.ema_model: Optional[nn.Module] = None
+        self.ema_decay = 0.0
+        self._init_ema()
 
     def fit(
         self,
@@ -132,7 +136,8 @@ class Trainer:
             train_loss = self._train_epoch(epoch)
 
             # Validation phase
-            val_loss, y_true, y_pred = self._validate_epoch()
+            eval_model = self.ema_model if self.ema_model is not None else self.model
+            val_loss, y_true, y_pred = self._validate_epoch(eval_model)
 
             # Compute metrics
             val_metrics = compute_metrics(
@@ -172,7 +177,7 @@ class Trainer:
 
             # Checkpoint
             if checkpoint:
-                checkpoint.save(self.model, self.optimizer, epoch, {
+                checkpoint.save(eval_model, self.optimizer, epoch, {
                     "val_macro_f1": val_metrics["macro_f1"],
                     "val_accuracy": val_metrics["accuracy"],
                     "val_loss": val_loss,
@@ -183,7 +188,7 @@ class Trainer:
                 best_f1 = val_metrics["macro_f1"]
                 # Save best model separately
                 torch.save(
-                    self.model.state_dict(),
+                    eval_model.state_dict(),
                     output_dir / "best_model.pth",
                 )
 
@@ -266,6 +271,7 @@ class Trainer:
                     nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
                     self.optimizer.step()
 
+                self._update_ema()
                 self.optimizer.zero_grad()
 
             total_loss += loss.item() * self.grad_accumulation_steps
@@ -273,13 +279,14 @@ class Trainer:
         avg_loss = total_loss / num_batches
         return avg_loss
 
-    def _validate_epoch(self) -> tuple:
+    def _validate_epoch(self, model: Optional[nn.Module] = None) -> tuple:
         """Run one validation epoch.
 
         Returns:
             (avg_val_loss, all_y_true, all_y_pred)
         """
-        self.model.eval()
+        eval_model = model if model is not None else self.model
+        eval_model.eval()
         total_loss = 0.0
         all_y_true = []
         all_y_pred = []
@@ -289,7 +296,7 @@ class Trainer:
                 images = images.to(self.device)
                 targets = targets.to(self.device)
 
-                logits = self.model(images)
+                logits = eval_model(images)
                 loss = self.criterion(logits, targets)
 
                 total_loss += loss.item()
@@ -300,6 +307,44 @@ class Trainer:
 
         avg_loss = total_loss / len(self.val_loader)
         return avg_loss, all_y_true, all_y_pred
+
+    def _init_ema(self) -> None:
+        """Initialize an exponential moving average copy when configured."""
+        ema_cfg = self.config.get("training", {}).get("ema", {}) or {}
+        if not ema_cfg.get("enabled", False):
+            return
+
+        decay = float(ema_cfg.get("decay", 0.999))
+        if not 0.0 < decay < 1.0:
+            raise ValueError(f"EMA decay must be between 0 and 1, got {decay}")
+
+        self.ema_decay = decay
+        self.ema_model = copy.deepcopy(self.model)
+        self.ema_model.eval()
+        for param in self.ema_model.parameters():
+            param.requires_grad_(False)
+        logger.info(
+            "EMA enabled: decay=%.6f; validation and best checkpoints use EMA weights",
+            self.ema_decay,
+        )
+
+    def _update_ema(self) -> None:
+        """Update EMA weights after an optimizer step."""
+        if self.ema_model is None:
+            return
+
+        with torch.no_grad():
+            model_state = self.model.state_dict()
+            ema_state = self.ema_model.state_dict()
+            for name, value in model_state.items():
+                ema_value = ema_state[name]
+                if torch.is_floating_point(ema_value):
+                    ema_value.mul_(self.ema_decay).add_(
+                        value.detach(),
+                        alpha=1.0 - self.ema_decay,
+                    )
+                else:
+                    ema_value.copy_(value)
 
     # ------------------------------------------------------------------
     # MixUp / CutMix helpers

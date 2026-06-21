@@ -1,0 +1,222 @@
+{
+  "experiment_id": "exp_052",
+  "status": "partial",
+  "created_at": "2026-06-21T15:28:47.140603+00:00",
+  "branch": "main",
+  "commit_hash": "224d0144",
+  "model": "logits_ensemble",
+  "image_size": "320",
+  "loss": "logits_average",
+  "augmentation": "default",
+  "dropout": "0.3",
+  "batch_size": "32",
+  "val_macro_f1": "0.9159",
+  "cloudy_f1": "0.8988",
+  "rainy_f1": "0.9056",
+  "snowy_f1": "0.9395",
+  "sunny_f1": "0.9197",
+  "cpu_time_per_image": "",
+  "model_size_mb": "",
+  "submit_check_passed": "",
+  "notes": "Logits ensemble exp_051 checkpoint averaging + exp_030 LabelSmoothing",
+  "git": {
+    "branch": "main",
+    "commit_hash": "224d0144",
+    "commit_message": "Merge remote-tracking branch 'origin/main'",
+    "dirty": true,
+    "dirty_files": [
+      "M configs/default.yaml",
+      " M experiments/experiment_queue.md",
+      " M \"experiments/\\345\\210\\206\\345\\267\\245.md\"",
+      " M training/trainer.py",
+      "?? outputs/exp_045/",
+      "?? outputs/exp_046/",
+      "?? outputs/exp_048/",
+      "?? outputs/exp_049/",
+      "?? outputs/exp_050/",
+      "?? outputs/exp_051/"
+    ]
+  },
+  "config": {
+    "data": {
+      "augmentation": {
+        "color_jitter": {
+          "brightness": 0.15,
+          "contrast": 0.15,
+          "hue": 0.05,
+          "saturation": 0.15
+        },
+        "cutmix_alpha": null,
+        "mixup_alpha": null,
+        "rand_augment": null,
+        "random_horizontal_flip": {
+          "prob": 0.5
+        },
+        "random_resized_crop": {
+          "ratio": [
+            0.9,
+            1.1
+          ],
+          "scale": [
+            0.7,
+            1.0
+          ]
+        },
+        "random_rotation": {
+          "degrees": 10
+        }
+      },
+      "image_size": 320,
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "multiprocessing_context": "spawn",
+      "num_workers": 1,
+      "pin_memory": false,
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ],
+      "test_dir": "data/test",
+      "train_dir": "data/train",
+      "val_dir": "data/val",
+      "val_split": 0.2
+    },
+    "inference": {
+      "batch_size": 32,
+      "device": "cpu",
+      "fp16": false,
+      "num_workers": 2,
+      "use_onnx": false
+    },
+    "logging": {
+      "experiment_name": "exp_039",
+      "log_dir": "outputs",
+      "log_interval": 10,
+      "tensorboard": true,
+      "wandb": false
+    },
+    "model": {
+      "dropout": 0.3,
+      "freeze_backbone": false,
+      "name": "logits_ensemble",
+      "num_classes": 4,
+      "pretrained": true
+    },
+    "seed": 42,
+    "training": {
+      "batch_size": 32,
+      "checkpoint": {
+        "mode": "max",
+        "monitor": "val_macro_f1",
+        "save_top_k": 3
+      },
+      "early_stopping": {
+        "min_delta": 0.001,
+        "patience": 10
+      },
+      "epochs": 50,
+      "loss": {
+        "name": "logits_average"
+      },
+      "optimizer": {
+        "lr": 0.0001,
+        "name": "adamw",
+        "weight_decay": 0.0005
+      },
+      "scheduler": {
+        "min_lr": 1e-06,
+        "name": "cosine",
+        "step_gamma": 0.1,
+        "step_size": 15,
+        "warmup_epochs": 3
+      }
+    },
+    "ensemble": {
+      "type": "logits_average",
+      "members": [
+        {
+          "weights": "outputs/exp_051/averaged_model.pth",
+          "config": "outputs/exp_051/config.yaml",
+          "weight": 1.0
+        },
+        {
+          "weights": "outputs/exp_030/best_model.pth",
+          "config": "outputs/exp_030/config.yaml",
+          "weight": 1.0
+        }
+      ]
+    }
+  },
+  "training": {},
+  "evaluation": {
+    "macro_f1": 0.9159,
+    "accuracy": 0.9118,
+    "per_class": {
+      "cloudy": {
+        "precision": 0.8935,
+        "recall": 0.9042,
+        "f1": 0.8988,
+        "support": 1660
+      },
+      "rainy": {
+        "precision": 0.9286,
+        "recall": 0.8838,
+        "f1": 0.9056,
+        "support": 456
+      },
+      "snowy": {
+        "precision": 0.9432,
+        "recall": 0.9359,
+        "f1": 0.9395,
+        "support": 390
+      },
+      "sunny": {
+        "precision": 0.9184,
+        "recall": 0.921,
+        "f1": 0.9197,
+        "support": 1722
+      }
+    },
+    "confusion_matrix": [
+      [
+        1501,
+        22,
+        11,
+        126
+      ],
+      [
+        41,
+        403,
+        6,
+        6
+      ],
+      [
+        11,
+        5,
+        365,
+        9
+      ],
+      [
+        127,
+        4,
+        5,
+        1586
+      ]
+    ],
+    "weak_classes": [
+      "cloudy",
+      "rainy"
+    ],
+    "avg_per_class_f1": 0.9159
+  },
+  "benchmark": {},
+  "submit_check": {},
+  "artifacts": {
+    "confusion_matrix.png": "confusion_matrix.png",
+    "error_samples.csv": "error_samples.csv"
+  }
+}
