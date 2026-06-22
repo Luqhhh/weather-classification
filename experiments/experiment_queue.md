@@ -1,18 +1,18 @@
 # Experiment Queue — ConvNeXt Generalization Plan
 
-> 更新：2026-06-21 | 目标：确认 Top 配置稳定性，并继续优化泛化与 rainy 类表现
+> 更新：2026-06-22 | 目标：确认 Top 配置稳定性，并继续优化泛化与 rainy 类表现
 
 ## 当前结论
 
 | 配置 | 关键结果 | 判断 |
 |------|----------|------|
-| exp_025: ConvNeXt-Tiny 320 + CE + d=0.3 | macro F1 0.9106 | 当前第一，作为主 baseline |
-| exp_027: ConvNeXt-Tiny 320 + CE + d=0.2 | macro F1 0.9097, rainy F1 0.895 | 与 exp_025 差距很小，需要多 seed 验证 |
-| exp_030: ConvNeXt-Tiny 320 + LabelSmoothing 0.05 + d=0.3 | macro F1 0.9087, rainy F1 0.8995 | 总分略低但 rainy 最强，值得组合验证 |
-| exp_031: ConvNeXt-Tiny 320 + LabelSmoothing 0.1 + d=0.3 | macro F1 0.9087 | 未超过 0.05，暂不优先 |
-| exp_023: EfficientNet-B1 384 + CE | macro F1 0.9045 | 可作为轻量 ensemble 互补模型 |
-| exp_024: ConvNeXt-Tiny 256 + CE | macro F1 0.9048 | 低于 320，不继续投入 256 路线 |
-| exp_039: ConvNeXt-Tiny 320 + CE + d=0.3 + wd=5e-4 | macro F1 0.9089 | B 组当前最佳；需补 seed 7/2026 后再和 exp_025 均值比较 |
+| exp_044: ConvNeXt-Tiny 320 + CE + d=0.3 + wd=0.05 + EMA | macro F1 0.9182, rainy F1 0.8972, val loss 0.2640 | 当前单模型第一，默认候选 |
+| exp_052: exp_051 + exp_030 logits avg | macro F1 0.9159, rainy F1 0.9056 | rainy 最强，但 CPU 成本待测 |
+| exp_051: exp_039 top-3 checkpoint averaging | macro F1 0.9158, rainy F1 0.8966 | 单权重 averaging 备选 |
+| exp_050: exp_039 + EMA | macro F1 0.9155, rainy F1 0.8952 | 低 weight decay EMA 备选 |
+| exp_025: ConvNeXt-Tiny 320 + CE + d=0.3 | macro F1 0.9106, rainy F1 0.8937 | 原主 baseline，保留对照 |
+| exp_030: ConvNeXt-Tiny 320 + LabelSmoothing 0.05 + d=0.3 | macro F1 0.9087, rainy F1 0.8995 | rainy 互补模型，适合 ensemble |
+| exp_042: CE + class-balanced sampler | macro F1 0.9059, rainy F1 0.8918 | sampler 已实现，但未达到继续 exp_043 的标准 |
 
 注意：`configs/models/convnext_tiny.yaml` 当前 `weight_decay=0.05`。下面的 `5e-4` 实验是**大幅降低 weight decay**，不是加强 weight decay；目的是验证当前 ConvNeXt 是否被过强 weight decay 限制。
 
@@ -118,9 +118,9 @@ Override 参数：
 
 | ID | 实验 | 参数 | 状态 |
 |----|------|------|------|
-| exp_041 | Dropout 0.2 + LabelSmoothing 0.05 | d=0.2, LS=0.05, wd=0.05 | 可直接运行 |
-| exp_042 | CE + class-balanced sampler | d=0.3, CE, balanced sampler | 需先实现 sampler |
-| exp_043 | LS 0.05 + class-balanced sampler | d=0.2, LS=0.05, balanced sampler | 需先实现 sampler |
+| exp_041 | Dropout 0.2 + LabelSmoothing 0.05 | d=0.2, LS=0.05, wd=0.05 | 已完成：macro F1 0.9057，rainy F1 0.8766 |
+| exp_042 | CE + class-balanced sampler | d=0.3, CE, balanced sampler | 已完成：macro F1 0.9059，rainy F1 0.8918 |
+| exp_043 | LS 0.05 + class-balanced sampler | d=0.2, LS=0.05, balanced sampler | 暂缓：exp_042 未达到继续 sampler 路线标准 |
 
 Override 参数：
 
@@ -132,9 +132,9 @@ Override 参数：
 
 实现备注：
 
-- 当前训练代码支持 `training.loss.class_weights`，但没有发现 `class-balanced sampler` 配置。
-- 若短期不想改 dataloader，可先用 `--training.loss.class_weights [...]` 做 proxy；但它不等价于 sampler。
-- sampler 路线只在 rainy recall / rainy F1 明显提升且 macro F1 不掉超过 0.001 时继续。
+- `training.sampler.name=class_balanced` 已接入 `create_dataloaders`，训练入口会把 `training.sampler` 传入 dataloader。
+- `tests/test_dataset.py` 已覆盖默认 sampler、显式 `none`、`class_balanced` 和显式 val dir 场景。
+- `exp_042` 未带来 macro F1 或 rainy F1 提升；除非官方数据重新显示 rainy recall 明显偏低，否则不优先继续 `exp_043`。
 
 ---
 
@@ -145,7 +145,7 @@ Override 参数：
 | ID | 实验 | 参数 | 状态 |
 |----|------|------|------|
 | infra_001 | 增加 EMA 支持 | `training.ema.enabled`, `training.ema.decay` | 已实现 |
-| exp_044 | EMA | 基于 exp_025，decay=0.999 | 依赖 infra_001 |
+| exp_044 | EMA | 基于 exp_025，decay=0.999 | 已完成：macro F1 0.9182，rainy F1 0.8972 |
 | exp_045 | SWA / checkpoint averaging | 基于 exp_025，平均 top-k checkpoints | 已完成：macro F1 0.9102，rainy F1 0.8956 |
 | exp_050 | EMA | 基于 exp_039 配置，decay=0.999 | 已完成：macro F1 0.9155，rainy F1 0.8952 |
 | exp_051 | SWA / checkpoint averaging | 基于 exp_039，平均 top-k checkpoints | 已完成：macro F1 0.9158，rainy F1 0.8966 |
@@ -160,10 +160,10 @@ EMA Override 参数：
 
 建议实现顺序：
 
-1. 先做离线 checkpoint averaging：读取 `outputs/exp_025/checkpoints/` 和 `outputs/exp_039/checkpoints/` 的 top-k checkpoint，分别评估 `exp_045` 和 `exp_051`。
-2. 如果 checkpoint averaging 有收益，再把 EMA 写进训练循环，并跑 `exp_044` / `exp_050`。
-3. EMA/SWA 必须同时记录 macro F1、rainy F1、val loss 和 CPU 推理时间。
-4. `exp_044/045` 保留为 exp_025 路线；`exp_050/051` 用于验证 exp_039 低 weight decay 路线。
+1. 离线 checkpoint averaging 已完成：`exp_045` 验证 exp_025 路线，`exp_051/053` 验证 exp_039 路线。
+2. EMA 已写进训练循环，并完成 `exp_044` / `exp_050`。
+3. EMA/SWA 仍需补齐 CPU 推理时间和 submission check。
+4. 当前优先级：`exp_044` 作为默认单模型候选；`exp_051/050` 作为低 weight decay 权重平滑备选。
 
 判定：
 
@@ -194,23 +194,21 @@ EMA Override 参数：
 ## 执行顺序
 
 ```text
-1. 先把 exp_024 / exp_030 / exp_031 结果纳入 leaderboard 和 results.csv
-2. 跑 P1 多 seed 复验：exp_032~037
-3. 若 P1 排名稳定，跑 P2：exp_038~040；若 exp_039 仍有竞争力，继续跑 exp_048~049
-4. 跑 P3 中可直接运行的 exp_041
-5. 若仍有提升空间，再实现 sampler / EMA / ensemble：
-   - infra_001 + exp_044/045 + exp_050/051
-   - infra_002 + exp_046/047
+1. 已把现有完成结果纳入 leaderboard；新增结果需同步维护 experiment_queue / leaderboard / finding
+2. P1/P2 已完成主要复验：exp_034~037、exp_039~041、exp_048~049
+3. P3 sampler 已完成 exp_042，但未达到继续 exp_043 的标准
+4. P4 EMA / checkpoint averaging 已完成 exp_044/045/050/051/053，下一步补 CPU benchmark / submission check
+5. P5 ensemble 已完成 exp_046/052；exp_047 仅在需要异构互补时再跑
 ```
 
 ## 当前待做清单
 
 | 优先级 | ID | 状态 |
 |--------|----|------|
-| P0 | 汇总 exp_024 / exp_030 / exp_031 | 待做 |
-| P1 | exp_032~037 | 待跑 |
+| P0 | 汇总完成实验到 leaderboard | 已完成；后续随新结果持续同步 |
+| P1 | exp_032~037 | exp_034~037 已有结果；exp_032~033 可选 |
 | P2 | exp_038~040, exp_048~049 | exp_038 待跑；exp_039~040、exp_048~049 已有结果 |
-| P3 | exp_041 | 待跑 |
-| P3+ | exp_042~043 | 需实现 sampler |
-| P4 | exp_044~045, exp_050~051 | EMA/checkpoint averaging 已实现；exp_045/050/051/053 已完成 |
+| P3 | exp_041 | 已完成：macro F1 0.9057，rainy F1 0.8766 |
+| P3+ | exp_042~043 | sampler 已实现；exp_042 已完成，exp_043 暂缓 |
+| P4 | exp_044~045, exp_050~051 | EMA/checkpoint averaging 已实现；exp_044/045/050/051/053 已完成 |
 | P5 | exp_046~047 | ensemble evaluate 已实现；exp_046/052 已完成；exp_047 可选 |
