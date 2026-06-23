@@ -9,12 +9,65 @@ Key design considerations:
 """
 
 import logging
+import random
 from typing import Dict, Optional, Tuple
 
 import torch
 from torchvision import transforms
 
 logger = logging.getLogger(__name__)
+
+
+class RandomMultiCutout:
+    """Mask several small square-ish regions after tensor normalization.
+
+    This is intentionally milder than CutMix: labels stay unchanged and the
+    total occluded area is capped to preserve weather-scene semantics.
+    """
+
+    def __init__(
+        self,
+        p: float = 0.5,
+        holes: int = 4,
+        max_area: float = 0.02,
+        fill: float | Tuple[float, float, float] = 0.0,
+    ):
+        if not 0.0 <= p <= 1.0:
+            raise ValueError(f"cutout p must be in [0, 1], got {p}")
+        if holes < 1:
+            raise ValueError(f"cutout holes must be >= 1, got {holes}")
+        if not 0.0 < max_area < 1.0:
+            raise ValueError(f"cutout max_area must be in (0, 1), got {max_area}")
+        self.p = p
+        self.holes = holes
+        self.max_area = max_area
+        self.fill = fill
+
+    def __call__(self, tensor: torch.Tensor) -> torch.Tensor:
+        if random.random() >= self.p:
+            return tensor
+        if tensor.dim() != 3:
+            raise ValueError(f"RandomMultiCutout expects CHW tensor, got {tuple(tensor.shape)}")
+
+        _, height, width = tensor.shape
+        out = tensor.clone()
+        fill = self._fill_tensor(tensor)
+
+        for _ in range(self.holes):
+            area = random.uniform(self.max_area * 0.25, self.max_area) * height * width
+            side = max(1, int(area ** 0.5))
+            cut_h = min(height, side)
+            cut_w = min(width, side)
+            top = random.randint(0, height - cut_h)
+            left = random.randint(0, width - cut_w)
+            out[:, top:top + cut_h, left:left + cut_w] = fill
+
+        return out
+
+    def _fill_tensor(self, tensor: torch.Tensor) -> torch.Tensor:
+        if isinstance(self.fill, tuple):
+            return torch.tensor(self.fill, dtype=tensor.dtype, device=tensor.device).view(-1, 1, 1)
+        return torch.tensor(float(self.fill), dtype=tensor.dtype, device=tensor.device)
 
 
 def get_train_transforms(
@@ -61,7 +114,8 @@ def get_train_transforms(
 
     # Mild rotation: weather photos can have slight tilt
     rotation_degrees = aug.get("random_rotation", {}).get("degrees", 10)
-    transform_list.append(transforms.RandomRotation(degrees=rotation_degrees))
+    if rotation_degrees:
+        transform_list.append(transforms.RandomRotation(degrees=rotation_degrees))
 
     # --- Color transforms (conservative!) ---
     cj_config = aug.get("color_jitter", {
@@ -100,6 +154,17 @@ def get_train_transforms(
     if aug.get("random_erasing_prob", 0) > 0:
         transform_list.append(
             transforms.RandomErasing(p=aug["random_erasing_prob"], scale=(0.02, 0.08))
+        )
+
+    cutout_cfg = aug.get("cutout")
+    if cutout_cfg:
+        transform_list.append(
+            RandomMultiCutout(
+                p=float(cutout_cfg.get("prob", 0.5)),
+                holes=int(cutout_cfg.get("holes", 4)),
+                max_area=float(cutout_cfg.get("max_area", 0.02)),
+                fill=cutout_cfg.get("fill", 0.0),
+            )
         )
 
     return transforms.Compose(transform_list)

@@ -189,15 +189,22 @@ def main():
     # Collect error samples (misclassified images)
     data_dir_path = Path(data_dir).resolve()
     error_samples = []
+    predictions = []
     for (img_path, true_idx), pred_idx, conf in zip(
         dataset.images, all_preds, all_confidences
     ):
+        try:
+            rel_path = str(img_path.resolve().relative_to(data_dir_path))
+        except ValueError:
+            rel_path = img_path.name
+        predictions.append({
+            "filename": rel_path,
+            "true_label": label_mapper.decode(true_idx),
+            "predicted_label": label_mapper.decode(pred_idx),
+            "confidence": round(conf, 6),
+            "correct": int(true_idx == pred_idx),
+        })
         if true_idx != pred_idx:
-            # Prefer relative path to data_dir; fall back to filename only
-            try:
-                rel_path = str(img_path.resolve().relative_to(data_dir_path))
-            except ValueError:
-                rel_path = img_path.name
             error_samples.append({
                 "filename": rel_path,
                 "true_label": label_mapper.decode(true_idx),
@@ -242,6 +249,16 @@ def main():
         writer.writeheader()
         writer.writerows(error_samples)
     logger.info(f"Error samples saved to {error_csv_path} ({len(error_samples)} misclassified)")
+
+    predictions_csv_path = output_dir / "predictions.csv"
+    with open(predictions_csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["filename", "true_label", "predicted_label", "confidence", "correct"],
+        )
+        writer.writeheader()
+        writer.writerows(predictions)
+    logger.info("Per-sample predictions saved to %s", predictions_csv_path)
 
     # --- Save structured results.json ---
     if args.save_results:

@@ -6,16 +6,16 @@
 
 | # | Experiment | 路线 | Model / Method | Macro F1 | rainy F1 | cloudy F1 | snowy F1 | sunny F1 | Best Epoch | 备注 |
 |---|------------|------|----------------|---------:|---------:|----------:|---------:|---------:|------------|------|
-| 1 | exp_044 | EMA | exp_025 config + EMA decay 0.999 | 0.9182 | 0.8972 | 0.9060 | 0.9398 | 0.9299 | 6 | 当前单模型第一 |
-| 2 | exp_052 | Ensemble | exp_051 + exp_030 logits avg | 0.9159 | 0.9056 | 0.8988 | 0.9395 | 0.9197 | eval | rainy 最强；CPU 成本待测 |
-| 3 | exp_051 | SWA | exp_039 top-3 checkpoint averaging | 0.9158 | 0.8966 | 0.9026 | 0.9404 | 0.9236 | eval | 单权重 averaging 备选 |
-| 4 | exp_050 | EMA | exp_039 config + EMA decay 0.999 | 0.9155 | 0.8952 | 0.9046 | 0.9356 | 0.9265 | 7 | 低 wd EMA 有效 |
-| 5 | exp_053 | SWA ablation | exp_039 epoch 5/6 averaging | 0.9120 | 0.8896 | 0.8983 | 0.9415 | 0.9185 | eval | top-2 消融 |
-| 6 | exp_025 | Single | ConvNeXt 320 CE d=0.3 wd=0.05 | 0.9106 | 0.8937 | 0.8890 | 0.9437 | 0.9158 | 43 | 原主 baseline |
-| 7 | exp_046 | Ensemble | exp_025 + exp_030 logits avg | 0.9106 | 0.8966 | 0.8915 | 0.9369 | 0.9172 | eval | macro 持平，rainy 小升 |
-| 8 | exp_045 | SWA | exp_025 top-3 checkpoint averaging | 0.9102 | 0.8956 | 0.8900 | 0.9386 | 0.9167 | eval | exp_025 averaging 未提升 |
-| 9 | exp_027 | Single | ConvNeXt 320 CE d=0.2 wd=0.05 | 0.9097 | 0.8950 | 0.8920 | 0.9400 | 0.9120 | 19 | 历史记录 |
-| 10 | exp_039 | Single | ConvNeXt 320 CE d=0.3 wd=5e-4 | 0.9089 | 0.8879 | 0.8935 | 0.9345 | 0.9197 | 6 | 低 wd seed42 |
+| 1 | exp_054 | EMA + weather-sensitive aug | ConvNeXt 320 CE d=0.3 wd=0.05, no rotation, light CJ | 0.9204 | 0.9025 | 0.9067 | 0.9452 | 0.9271 | 8 | 当前单模型第一 |
+| 2 | exp_044 | EMA | exp_025 config + EMA decay 0.999 | 0.9182 | 0.8972 | 0.9060 | 0.9398 | 0.9299 | 6 | 原单模型第一 |
+| 3 | exp_055 | EMA + small cutout | exp_054 + small cutout | 0.9173 | 0.9013 | 0.9050 | 0.9378 | 0.9251 | 4 | cutout 未超过 exp_054 |
+| 4 | exp_056 | FixRes | exp_054 -> 384 head/norm finetune | 0.9170 | 0.9012 | 0.8998 | 0.9451 | 0.9220 | 7 | 384 微调未超过 320 |
+| 5 | exp_052 | Ensemble | exp_051 + exp_030 logits avg | 0.9159 | 0.9056 | 0.8988 | 0.9395 | 0.9197 | eval | rainy 最强；CPU 成本待测 |
+| 6 | exp_051 | SWA | exp_039 top-3 checkpoint averaging | 0.9158 | 0.8966 | 0.9026 | 0.9404 | 0.9236 | eval | 单权重 averaging 备选 |
+| 7 | exp_050 | EMA | exp_039 config + EMA decay 0.999 | 0.9155 | 0.8952 | 0.9046 | 0.9356 | 0.9265 | 7 | 低 wd EMA 有效 |
+| 8 | exp_053 | SWA ablation | exp_039 epoch 5/6 averaging | 0.9120 | 0.8896 | 0.8983 | 0.9415 | 0.9185 | eval | top-2 消融 |
+| 9 | exp_025 | Single | ConvNeXt 320 CE d=0.3 wd=0.05 | 0.9106 | 0.8937 | 0.8890 | 0.9437 | 0.9158 | 43 | 原主 baseline |
+| 10 | exp_046 | Ensemble | exp_025 + exp_030 logits avg | 0.9106 | 0.8966 | 0.8915 | 0.9369 | 0.9172 | eval | macro 持平，rainy 小升 |
 
 ---
 
@@ -23,23 +23,24 @@
 
 | # | Experiment | 类型 | Macro F1 | rainy F1 | 推理成本 | 判断 |
 |---|------------|------|---------:|---------:|----------|------|
-| 1 | exp_044 | 单权重 EMA | 0.9182 | 0.8972 | 1x ConvNeXt | 当前默认主候选 |
-| 2 | exp_052 | 双模型 ensemble | 0.9159 | 0.9056 | 约 2x ConvNeXt | rainy 优先方案，需 CPU benchmark |
-| 3 | exp_051 | 单权重 checkpoint averaging | 0.9158 | 0.8966 | 1x ConvNeXt | 单权重 averaging 备选 |
-| 4 | exp_050 | 单权重 EMA | 0.9155 | 0.8952 | 1x ConvNeXt | 低 wd EMA 备选 |
-| 5 | exp_025 | 单 checkpoint baseline | 0.9106 | 0.8937 | 1x ConvNeXt | 保留对照 |
+| 1 | exp_054 | 单权重 EMA | 0.9204 | 0.9025 | 1x ConvNeXt | 当前默认主候选 |
+| 2 | exp_044 | 单权重 EMA | 0.9182 | 0.8972 | 1x ConvNeXt | 原主候选，对照 |
+| 3 | exp_052 | 双模型 ensemble | 0.9159 | 0.9056 | 约 2x ConvNeXt | rainy 优先方案，需 CPU benchmark |
+| 4 | exp_051 | 单权重 checkpoint averaging | 0.9158 | 0.8966 | 1x ConvNeXt | 单权重 averaging 备选 |
+| 5 | exp_050 | 单权重 EMA | 0.9155 | 0.8952 | 1x ConvNeXt | 低 wd EMA 备选 |
 
 ## 子榜 B - EMA / SWA / Checkpoint Averaging
 
 | # | Experiment | 基础路线 | 平滑方式 | Macro F1 | rainy F1 | cloudy F1 | snowy F1 | sunny F1 | 结论 |
 |---|------------|----------|----------|---------:|---------:|----------:|---------:|---------:|------|
-| 1 | exp_044 | exp_025 | EMA decay 0.999 | 0.9182 | 0.8972 | 0.9060 | 0.9398 | 0.9299 | 当前单权重最强 |
-| 2 | exp_051 | exp_039 | top-3 checkpoint averaging | 0.9158 | 0.8966 | 0.9026 | 0.9404 | 0.9236 | averaging 备选 |
-| 3 | exp_050 | exp_039 | EMA decay 0.999 | 0.9155 | 0.8952 | 0.9046 | 0.9356 | 0.9265 | 低 wd EMA 有效 |
-| 4 | exp_053 | exp_039 | epoch 5/6 averaging | 0.9120 | 0.8896 | 0.8983 | 0.9415 | 0.9185 | 不如 top-3 |
-| 5 | exp_045 | exp_025 | top-3 checkpoint averaging | 0.9102 | 0.8956 | 0.8900 | 0.9386 | 0.9167 | 未超过 exp_025 |
-| 6 | exp_025 | exp_025 | none | 0.9106 | 0.8937 | 0.8890 | 0.9437 | 0.9158 | 原 baseline |
-| 7 | exp_039 | exp_039 | none | 0.9089 | 0.8879 | 0.8935 | 0.9345 | 0.9197 | 低 wd 单点 |
+| 1 | exp_054 | exp_025 + no rotation/light CJ | EMA decay 0.999 | 0.9204 | 0.9025 | 0.9067 | 0.9452 | 0.9271 | 当前单权重最强 |
+| 2 | exp_044 | exp_025 | EMA decay 0.999 | 0.9182 | 0.8972 | 0.9060 | 0.9398 | 0.9299 | 原单权重最强 |
+| 3 | exp_051 | exp_039 | top-3 checkpoint averaging | 0.9158 | 0.8966 | 0.9026 | 0.9404 | 0.9236 | averaging 备选 |
+| 4 | exp_050 | exp_039 | EMA decay 0.999 | 0.9155 | 0.8952 | 0.9046 | 0.9356 | 0.9265 | 低 wd EMA 有效 |
+| 5 | exp_053 | exp_039 | epoch 5/6 averaging | 0.9120 | 0.8896 | 0.8983 | 0.9415 | 0.9185 | 不如 top-3 |
+| 6 | exp_045 | exp_025 | top-3 checkpoint averaging | 0.9102 | 0.8956 | 0.8900 | 0.9386 | 0.9167 | 未超过 exp_025 |
+| 7 | exp_025 | exp_025 | none | 0.9106 | 0.8937 | 0.8890 | 0.9437 | 0.9158 | 原 baseline |
+| 8 | exp_039 | exp_039 | none | 0.9089 | 0.8879 | 0.8935 | 0.9345 | 0.9197 | 低 wd 单点 |
 
 ## 子榜 C - Ensemble
 
@@ -47,6 +48,17 @@
 |---|------------|------|---------:|---------:|----------:|---------:|---------:|------|
 | 1 | exp_052 | exp_051 + exp_030 | 0.9159 | 0.9056 | 0.8988 | 0.9395 | 0.9197 | rainy 明显提升，CPU 待测 |
 | 2 | exp_046 | exp_025 + exp_030 | 0.9106 | 0.8966 | 0.8915 | 0.9369 | 0.9172 | 不超过主线 |
+
+## 子榜 C2 - 天气语义增强 / 离线诊断
+
+| # | Experiment | 类型 | Macro F1 / 结果 | rainy F1 | cloudy F1 | snowy F1 | sunny F1 | 判断 |
+|---|------------|------|----------------:|---------:|----------:|---------:|---------:|------|
+| 1 | exp_054 | no rotation + light ColorJitter + EMA | 0.9204 | 0.9025 | 0.9067 | 0.9452 | 0.9271 | 当前主线 |
+| 2 | exp_055 | exp_054 + small cutout | 0.9173 | 0.9013 | 0.9050 | 0.9378 | 0.9251 | 不如 exp_054 |
+| 3 | exp_056 | FixRes 384 head/norm finetune | 0.9170 | 0.9012 | 0.8998 | 0.9451 | 0.9220 | 不如 exp_054 |
+| 4 | exp_057 | CPU single-model TTA | 0.8982 | 0.8666 | 0.8887 | 0.9274 | 0.9101 | center-crop TTA 负收益，93.1 ms/image |
+| 5 | exp_058 | confidence 分析 | fixed=71 / regressed=80 | - | - | - | - | ensemble 主要影响低置信度边界样本，但净准确率不升 |
+| 6 | exp_059 | 手工特征诊断 | feature stats | - | - | - | - | snowy 更亮/低饱和，sunny 高饱和，错误样本特征均值差异不大 |
 
 ## 子榜 D - ConvNeXt 320 CE 多 Seed 对照
 

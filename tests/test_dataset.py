@@ -94,6 +94,22 @@ class TestTransforms:
         # With ImageNet normalization, mid-gray should be near-zero
         assert -0.5 < output.mean() < 0.5
 
+    def test_train_transform_with_small_cutout(self):
+        transform = get_train_transforms(
+            image_size=64,
+            augmentation={
+                "random_resized_crop": {"scale": [1.0, 1.0], "ratio": [1.0, 1.0]},
+                "random_horizontal_flip": {"prob": 0.0},
+                "random_rotation": {"degrees": 0},
+                "color_jitter": None,
+                "cutout": {"prob": 1.0, "holes": 2, "max_area": 0.02, "fill": 0.0},
+            },
+        )
+        img = Image.new("RGB", (64, 64), color=(100, 150, 200))
+        output = transform(img)
+        assert output.shape == (3, 64, 64)
+        assert (output == 0).any()
+
 
 class TestWeatherDataset:
     """Tests for WeatherDataset."""

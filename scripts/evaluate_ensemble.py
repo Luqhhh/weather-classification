@@ -195,14 +195,24 @@ def main() -> None:
 
     data_dir_path = Path(data_dir).resolve()
     error_samples = []
+    predictions = []
     for (img_path, true_idx), pred_idx, conf in zip(
         dataset.images, all_preds, all_confidences
     ):
+        try:
+            rel_path = str(img_path.resolve().relative_to(data_dir_path))
+        except ValueError:
+            rel_path = img_path.name
+        predictions.append(
+            {
+                "filename": rel_path,
+                "true_label": label_mapper.decode(true_idx),
+                "predicted_label": label_mapper.decode(pred_idx),
+                "confidence": round(conf, 6),
+                "correct": int(true_idx == pred_idx),
+            }
+        )
         if true_idx != pred_idx:
-            try:
-                rel_path = str(img_path.resolve().relative_to(data_dir_path))
-            except ValueError:
-                rel_path = img_path.name
             error_samples.append(
                 {
                     "filename": rel_path,
@@ -227,6 +237,14 @@ def main() -> None:
         )
         writer.writeheader()
         writer.writerows(error_samples)
+
+    with open(output_dir / "predictions.csv", "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["filename", "true_label", "predicted_label", "confidence", "correct"],
+        )
+        writer.writeheader()
+        writer.writerows(predictions)
 
     ensemble_metadata = _ensemble_config(base_config, members)
     with open(output_dir / "ensemble_members.json", "w", encoding="utf-8") as f:

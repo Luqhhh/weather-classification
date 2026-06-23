@@ -34,3 +34,16 @@ def test_resolve_device_explicit_cuda_falls_back_when_unavailable(monkeypatch):
 def test_resolve_device_rejects_unknown_device():
     with pytest.raises(ValueError):
         train.resolve_device("tpu")
+
+
+def test_extract_model_state_from_plain_state_dict():
+    state = {"fc.weight": "weights"}
+
+    assert train._extract_model_state(state) is state
+
+
+def test_extract_model_state_from_checkpoint():
+    model_state = {"fc.weight": "weights"}
+    checkpoint = {"model_state_dict": model_state, "epoch": 3}
+
+    assert train._extract_model_state(checkpoint) is model_state

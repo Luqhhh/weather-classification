@@ -256,6 +256,14 @@ def main():
         dropout=model_cfg.get("dropout", 0.3),
         freeze_backbone=model_cfg.get("freeze_backbone", False),
     )
+    if model_cfg.get("init_weights"):
+        _load_initial_weights(
+            model,
+            Path(model_cfg["init_weights"]),
+            strict=bool(model_cfg.get("init_strict", True)),
+        )
+    if model_cfg.get("train_norm_layers", False):
+        _set_backbone_norm_trainable(model)
     logger.info(f"Model created: {model.backbone_name}")
 
     # Create loss
@@ -423,6 +431,61 @@ def _create_optimizer(opt_cfg: dict, model: torch.nn.Module):
         )
     else:
         raise ValueError(f"Unknown optimizer: {name}")
+
+
+def _extract_model_state(state: dict) -> dict:
+    """Return a plain model state_dict from common checkpoint formats."""
+    if isinstance(state, dict) and "model_state_dict" in state:
+        return state["model_state_dict"]
+    return state
+
+
+def _load_initial_weights(
+    model: torch.nn.Module,
+    weights_path: Path,
+    strict: bool = True,
+) -> None:
+    """Initialize a model from an existing checkpoint before optimization."""
+    if not weights_path.is_file():
+        raise FileNotFoundError(f"Initial weights not found: {weights_path}")
+    try:
+        state = torch.load(weights_path, map_location="cpu", weights_only=True)
+    except TypeError:
+        state = torch.load(weights_path, map_location="cpu")
+    state = _extract_model_state(state)
+    incompatible = model.load_state_dict(state, strict=strict)
+    if not strict:
+        logger.info(
+            "Loaded initial weights from %s with missing=%s unexpected=%s",
+            weights_path,
+            incompatible.missing_keys,
+            incompatible.unexpected_keys,
+        )
+    else:
+        logger.info("Loaded initial weights from %s", weights_path)
+
+
+def _set_backbone_norm_trainable(model: torch.nn.Module) -> None:
+    """Unfreeze normalization layers inside the backbone for FixRes-style tuning."""
+    norm_types = (
+        torch.nn.BatchNorm1d,
+        torch.nn.BatchNorm2d,
+        torch.nn.BatchNorm3d,
+        torch.nn.LayerNorm,
+        torch.nn.GroupNorm,
+        torch.nn.InstanceNorm1d,
+        torch.nn.InstanceNorm2d,
+        torch.nn.InstanceNorm3d,
+    )
+    count = 0
+    backbone = getattr(model, "backbone", model)
+    for module in backbone.modules():
+        if isinstance(module, norm_types):
+            for param in module.parameters(recurse=False):
+                param.requires_grad = True
+                count += param.numel()
+            module.train()
+    logger.info("Unfroze backbone norm-layer parameters: %.2fM", count / 1e6)
 
 
 def _create_scheduler(

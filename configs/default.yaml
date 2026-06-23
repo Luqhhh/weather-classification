@@ -65,7 +65,7 @@ training:
     step_gamma: 0.1        # For step scheduler
   loss:
     name: "cross_entropy"  # Options: cross_entropy, focal, label_smoothing
-    label_smoothing: 0.1
+    label_smoothing: 0.0   # Only used when name='label_smoothing'; ignored by cross_entropy/focal
     # class_weights: [1.0, 1.2, 1.0, 0.8]   # per-class weights for imbalanced data
     # focal_gamma: 2.0                       # focusing parameter (focal loss only)
   early_stopping:
