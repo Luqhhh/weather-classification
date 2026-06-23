@@ -1,6 +1,6 @@
 # Experiment Queue — ConvNeXt Generalization Plan
 
-> 更新：2026-06-22 | 目标：确认 Top 配置稳定性，并继续优化泛化与 rainy 类表现
+> 更新：2026-06-23 | 目标：确认 Top 配置稳定性，并继续优化泛化与 rainy 类表现
 
 ## 当前结论
 
@@ -10,7 +10,7 @@
 | exp_052: exp_051 + exp_030 logits avg | macro F1 0.9159, rainy F1 0.9056 | rainy 最强，但 CPU 成本待测 |
 | exp_051: exp_039 top-3 checkpoint averaging | macro F1 0.9158, rainy F1 0.8966 | 单权重 averaging 备选 |
 | exp_050: exp_039 + EMA | macro F1 0.9155, rainy F1 0.8952 | 低 weight decay EMA 备选 |
-| exp_025: ConvNeXt-Tiny 320 + CE + d=0.3 | macro F1 0.9106, rainy F1 0.8937 | 原主 baseline，保留对照 |
+| exp_025/032/033: ConvNeXt-Tiny 320 + CE + d=0.3 | seed42 macro F1 0.9106；3-seed mean 0.9074, std 0.0028 | 原主 baseline，保留对照；单点高分有 seed 波动 |
 | exp_030: ConvNeXt-Tiny 320 + LabelSmoothing 0.05 + d=0.3 | macro F1 0.9087, rainy F1 0.8995 | rainy 互补模型，适合 ensemble |
 | exp_042: CE + class-balanced sampler | macro F1 0.9059, rainy F1 0.8918 | sampler 已实现，但未达到继续 exp_043 的标准 |
 
@@ -55,8 +55,8 @@ python3 scripts/train.py \
 
 | ID | 复验对象 | Seed | 参数 | 结论标准 |
 |----|----------|------|------|----------|
-| exp_032 | exp_025 | 7 | CE, d=0.3, wd=0.05 | 与 seed 42 共同计算均值 |
-| exp_033 | exp_025 | 2026 | CE, d=0.3, wd=0.05 | 与 seed 42 共同计算均值 |
+| exp_032 | exp_025 | 7 | CE, d=0.3, wd=0.05 | 已完成：macro F1 0.9053，rainy F1 0.8715 |
+| exp_033 | exp_025 | 2026 | CE, d=0.3, wd=0.05 | 已完成：macro F1 0.9064，rainy F1 0.8811 |
 | exp_034 | exp_027 | 7 | CE, d=0.2, wd=0.05 | 检查 d=0.2 是否稳定超过 d=0.3 |
 | exp_035 | exp_027 | 2026 | CE, d=0.2, wd=0.05 | 检查 d=0.2 是否稳定超过 d=0.3 |
 | exp_036 | exp_030 | 7 | LabelSmoothing 0.05, d=0.3, wd=0.05 | 检查 rainy 优势是否稳定 |
@@ -79,6 +79,8 @@ Override 参数：
 - 若 mean F1 接近但 rainy F1 明显更高，保留作 ensemble 或 class-balanced 路线。
 - 若 std >= 0.003，后续所有结论必须用多 seed，不再用单次 F1 排名。
 
+结果：`exp_025/032/033` 的 macro F1 mean/std 为 0.9074/0.0028，rainy F1 mean 为 0.8821；`exp_025` 的 seed42 单点仍可作为对照，但普通 CE baseline 未稳定超过后续 EMA/SWA 路线。
+
 ---
 
 ## P2 — ConvNeXt 320 窄范围正则化
@@ -87,7 +89,7 @@ Override 参数：
 
 | ID | 实验 | 参数 | 预期 |
 |----|------|------|------|
-| exp_038 | Dropout 中点 | d=0.25, wd=0.05, CE | 判断 0.2 与 0.3 之间是否有更稳点 |
+| exp_038 | Dropout 中点 | d=0.25, wd=0.05, CE | 已完成：macro F1 0.9046，低于 seed42 的 d=0.2/d=0.3 |
 | exp_039 | 降低 weight decay | d=0.3, wd=5e-4, CE | 测试当前 0.05 是否压制学习 |
 | exp_040 | Dropout 中点 + 降低 weight decay | d=0.25, wd=5e-4, CE | 观察低 wd 是否需要更弱 dropout 配合 |
 | exp_048 | 复验 exp_039 | seed 7, d=0.3, wd=5e-4, CE | 与 exp_039 共同统计低 wd 配置 mean/std |
@@ -195,7 +197,7 @@ EMA Override 参数：
 
 ```text
 1. 已把现有完成结果纳入 leaderboard；新增结果需同步维护 experiment_queue / leaderboard / finding
-2. P1/P2 已完成主要复验：exp_034~037、exp_039~041、exp_048~049
+2. P1/P2 已完成主要复验：exp_032~042、exp_048~049
 3. P3 sampler 已完成 exp_042，但未达到继续 exp_043 的标准
 4. P4 EMA / checkpoint averaging 已完成 exp_044/045/050/051/053，下一步补 CPU benchmark / submission check
 5. P5 ensemble 已完成 exp_046/052；exp_047 仅在需要异构互补时再跑
@@ -206,8 +208,8 @@ EMA Override 参数：
 | 优先级 | ID | 状态 |
 |--------|----|------|
 | P0 | 汇总完成实验到 leaderboard | 已完成；后续随新结果持续同步 |
-| P1 | exp_032~037 | exp_034~037 已有结果；exp_032~033 可选 |
-| P2 | exp_038~040, exp_048~049 | exp_038 待跑；exp_039~040、exp_048~049 已有结果 |
+| P1 | exp_032~037 | 已完成：exp_032~037 均有结果；d=0.3 CE mean/std 0.9074/0.0028 |
+| P2 | exp_038~040, exp_048~049 | 已完成：exp_038~040、exp_048~049 均有结果；d=0.25 未优于两侧 |
 | P3 | exp_041 | 已完成：macro F1 0.9057，rainy F1 0.8766 |
 | P3+ | exp_042~043 | sampler 已实现；exp_042 已完成，exp_043 暂缓 |
 | P4 | exp_044~045, exp_050~051 | EMA/checkpoint averaging 已实现；exp_044/045/050/051/053 已完成 |

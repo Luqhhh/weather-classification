@@ -1,0 +1,10 @@
+{
+  "branch": "feature/phase3-a-stability",
+  "commit_hash": "3dc800fd",
+  "commit_message": "docs: reorganize experiment plan and outputs",
+  "dirty": true,
+  "dirty_files": [
+    "?? memory/",
+    "?? outputs/exp_032/"
+  ]
+}
