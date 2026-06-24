@@ -65,10 +65,18 @@ Thumbs.db
 *.log
 logs/
 
+# Old data backups (keep locally, not for git)
+data/old_*/
+
+# Old outputs
+outputs/old/
+
 # Submission artifacts
 submit/build/
+submit/exp_*/
 submit/*.zip
 submit/*.tar.gz
+submit_*.zip
 
 # Environment
 .env
