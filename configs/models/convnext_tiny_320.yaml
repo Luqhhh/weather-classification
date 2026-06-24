@@ -1,0 +1,55 @@
+# ConvNeXt-Tiny 320 — Competition config (based on exp_054, best local F1=0.9204)
+#
+# Usage:
+#   python scripts/train.py --config configs/models/convnext_tiny_320.yaml
+#
+# To replicate exp_044 (EMA only, standard aug) for ablation:
+#   python scripts/train.py --config configs/models/convnext_tiny_320.yaml \
+#     --data.augmentation.random_rotation.degrees 10 \
+#     --data.augmentation.color_jitter '{"brightness":0.15,"contrast":0.15,"saturation":0.15,"hue":0.05}'
+
+model:
+  name: "convnext_tiny"
+  pretrained: true
+  dropout: 0.3
+
+data:
+  image_size: 320
+  # Conservative augmentation — weather semantics depend on color/lighting
+  augmentation:
+    random_resized_crop:
+      scale: [0.7, 1.0]
+      ratio: [0.9, 1.1]
+    random_horizontal_flip:
+      prob: 0.5
+    color_jitter:
+      brightness: 0.08
+      contrast: 0.08
+      saturation: 0.08
+      hue: 0.03
+    random_rotation:
+      degrees: 0          # No rotation — sky orientation matters
+    rand_augment: null
+    mixup_alpha: null
+    cutmix_alpha: null
+
+training:
+  batch_size: 32          # 320×320 needs smaller batch for 8GB VRAM
+  epochs: 50
+  optimizer:
+    name: "adamw"
+    lr: 0.0001
+    weight_decay: 0.05
+  scheduler:
+    name: "cosine"
+    warmup_epochs: 3
+    min_lr: 0.000001
+  ema:
+    enabled: true
+    decay: 0.999
+
+# Expected:
+#   Params: ~27.8M
+#   Weight size: ~106 MB
+#   CPU latency (320×320): ~140ms/img
+#   3000 images → ~7 min on CPU

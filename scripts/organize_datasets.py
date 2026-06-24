@@ -55,7 +55,8 @@ FOLDER_TO_CLASS = {
 
 IMG_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"}
 
-VAL_SPLIT = 0.2
+VAL_SPLIT = 0.15
+HOLDOUT_SPLIT = 0.15
 RANDOM_SEED = 42
 
 
@@ -181,20 +182,37 @@ def merge_and_copy(
     return counts
 
 
-def create_train_val_split(
+def create_train_val_holdout_split(
     source_dir: Path,
     val_split: float = VAL_SPLIT,
+    holdout_split: float = HOLDOUT_SPLIT,
     seed: int = RANDOM_SEED,
 ) -> Dict[str, int]:
-    """Create content-deduplicated stratified train/val split from merged data."""
-    logger.info(f"Creating train/val split (val={val_split:.0%}, seed={seed})...")
+    """Create content-deduplicated stratified train/val/holdout split from merged data.
+
+    Splits each class into three partitions after global SHA-256 dedup:
+      - train: (1 - val_split - holdout_split) of unique images
+      - val:   val_split of unique images
+      - holdout: holdout_split of unique images (untouched during training/tuning)
+
+    If holdout_split is 0, falls back to the classic train/val split.
+    """
+    holdout_enabled = holdout_split > 0
+    if holdout_enabled:
+        logger.info(
+            f"Creating train/val/holdout split "
+            f"(val={val_split:.0%}, holdout={holdout_split:.0%}, seed={seed})..."
+        )
+    else:
+        logger.info(f"Creating train/val split (val={val_split:.0%}, seed={seed})...")
 
     rng = np.random.RandomState(seed)
     train_dir = Path("data/train")
     val_dir = Path("data/val")
+    holdout_dir = Path("data/holdout")
     test_dir = Path("data/test")
 
-    stats = {"train": 0, "val": 0, "duplicates_skipped": 0}
+    stats = {"train": 0, "val": 0, "holdout": 0, "duplicates_skipped": 0}
     seen_hashes: Set[str] = set()
 
     for cls in TARGET_CLASSES:
@@ -219,11 +237,18 @@ def create_train_val_split(
         rng.shuffle(images)
 
         n_val = max(1, int(len(images) * val_split))
+        n_holdout = max(1, int(len(images) * holdout_split)) if holdout_enabled else 0
+        # Ensure we don't overshoot (edge case with very small classes)
+        n_val = min(n_val, len(images) - n_holdout - 1) if n_holdout > 0 else n_val
+
         val_imgs = images[:n_val]
-        train_imgs = images[n_val:]
+        holdout_imgs = images[n_val:n_val + n_holdout] if holdout_enabled else []
+        train_imgs = images[n_val + n_holdout:]
 
         (train_dir / cls).mkdir(parents=True, exist_ok=True)
         (val_dir / cls).mkdir(parents=True, exist_ok=True)
+        if holdout_enabled:
+            (holdout_dir / cls).mkdir(parents=True, exist_ok=True)
 
         for img in tqdm(train_imgs, desc=f"  train/{cls}", unit="img"):
             tgt = train_dir / cls / img.name
@@ -235,15 +260,25 @@ def create_train_val_split(
             if not tgt.exists():
                 shutil.copy2(img, tgt)
 
+        if holdout_enabled:
+            for img in tqdm(holdout_imgs, desc=f"  holdout/{cls}", unit="img"):
+                tgt = holdout_dir / cls / img.name
+                if not tgt.exists():
+                    shutil.copy2(img, tgt)
+
         stats["train"] += len(train_imgs)
         stats["val"] += len(val_imgs)
+        stats["holdout"] += len(holdout_imgs)
         stats["duplicates_skipped"] += duplicates_skipped
-        logger.info(
-            f"  {cls}: train={len(train_imgs)}, val={len(val_imgs)}"
-            + (f", duplicates_skipped={duplicates_skipped}" if duplicates_skipped else "")
-        )
 
-    # Create minimal test set for smoke testing
+        parts = f"train={len(train_imgs)}, val={len(val_imgs)}"
+        if holdout_enabled:
+            parts += f", holdout={len(holdout_imgs)}"
+        if duplicates_skipped:
+            parts += f", duplicates_skipped={duplicates_skipped}"
+        logger.info(f"  {cls}: {parts}")
+
+    # Create minimal test set for smoke testing (drawn from val)
     test_dir.mkdir(parents=True, exist_ok=True)
     for cls in TARGET_CLASSES:
         (test_dir / cls).mkdir(parents=True, exist_ok=True)
@@ -410,8 +445,8 @@ def main():
         logger.error("No images collected! Check dataset paths.")
         sys.exit(1)
 
-    # Step 7: Train/val split
-    stats = create_train_val_split(merge_dir)
+    # Step 7: Train/val/holdout split
+    stats = create_train_val_holdout_split(merge_dir)
 
     # Step 8: Save label mapping
     save_label_mapping()
@@ -419,9 +454,11 @@ def main():
     # Step 9: Final summary
     logger.info("\n" + "=" * 60)
     logger.info("✅ Dataset organization complete!")
-    logger.info(f"   Train:  {stats['train']} images → data/train/")
-    logger.info(f"   Val:    {stats['val']} images → data/val/")
-    logger.info(f"   Test:   ~5 per class → data/test/ (smoke testing)")
+    logger.info(f"   Train:   {stats['train']} images → data/train/")
+    logger.info(f"   Val:     {stats['val']} images → data/val/")
+    if stats.get("holdout", 0) > 0:
+        logger.info(f"   Holdout: {stats['holdout']} images → data/holdout/")
+    logger.info(f"   Test:    ~5 per class → data/test/ (smoke testing)")
     logger.info(f"\n   reports/label_mapping.json → use this for submission!")
     logger.info("=" * 60)
 

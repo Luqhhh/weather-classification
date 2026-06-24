@@ -212,6 +212,201 @@ Pillow>=9.5.0
 """
 
 
+def retrain_on_full_data(
+    weights_path: Path,
+    config: dict,
+    data_dirs: list,
+    label_mapper,
+    output_path: Path,
+    finetune_epochs: int = 5,
+    finetune_lr: float = 1e-5,
+    device: str = "cuda",
+) -> Path:
+    """Retrain the best model on the full dataset (train+val+holdout).
+
+    Warm-starts from the best checkpoint, uses a low learning rate for a
+    small number of epochs to avoid overfitting while letting the model
+    see all available labelled data.
+
+    Returns:
+        Path to the retrained model weights.
+    """
+    from data.dataset import WeatherDataset
+    from data.transforms import build_transforms
+    from models.model_factory import create_model
+    from training.trainer import Trainer
+    from training.losses import create_loss_function
+    from training.callbacks import EarlyStopping, ModelCheckpoint, TrainingLogger
+    from torch.utils.data import ConcatDataset, DataLoader
+
+    data_cfg = config.get("data", {})
+    model_cfg = config.get("model", {})
+    training_cfg = config.get("training", {})
+
+    image_size = data_cfg.get("image_size", 224)
+    mean = tuple(data_cfg.get("mean", [0.485, 0.456, 0.406]))
+    std = tuple(data_cfg.get("std", [0.229, 0.224, 0.225]))
+    batch_size = training_cfg.get("batch_size", 64)
+    num_workers = data_cfg.get("num_workers", 1)
+
+    logger.info("=" * 60)
+    logger.info("Retraining on full dataset (train + val + holdout)")
+    logger.info(f"  Epochs: {finetune_epochs}, LR: {finetune_lr}")
+    logger.info(f"  Device: {device}")
+
+    # Build transforms
+    train_transform = build_transforms(
+        mode="train", image_size=image_size, mean=mean, std=std,
+        augmentation=data_cfg.get("augmentation"),
+    )
+
+    # Load all data directories into a single dataset
+    full_datasets = []
+    total_images = 0
+    for d in data_dirs:
+        if Path(d).is_dir():
+            ds = WeatherDataset(data_dir=d, transform=None, label_mapper=label_mapper)
+            full_datasets.append(ds)
+            total_images += len(ds)
+            logger.info(f"  Loaded {len(ds)} images from {d}")
+
+    if not full_datasets:
+        logger.error("No data directories found for retraining!")
+        sys.exit(1)
+
+    # For simplicity, use the first dataset as base and concatenate rest
+    # We use a Subset wrapper to avoid double-transforming
+    class RetrainDataset(torch.utils.data.Dataset):
+        """Flat dataset combining multiple WeatherDatasets."""
+        def __init__(self, datasets):
+            self.samples = []
+            for ds in datasets:
+                for path, label in ds.images:
+                    self.samples.append((path, label))
+            self.transform = None
+
+        def __len__(self):
+            return len(self.samples)
+
+        def __getitem__(self, idx):
+            path, label = self.samples[idx]
+            from PIL import Image, ImageFile
+            ImageFile.LOAD_TRUNCATED_IMAGES = True
+            img = Image.open(path).convert("RGB")
+            return img, label
+
+    full_ds = RetrainDataset(full_datasets)
+    full_ds.transform = train_transform
+
+    # Override transform application
+    class TransformDataset(torch.utils.data.Dataset):
+        def __init__(self, base_ds, transform):
+            self.base = base_ds
+            self.transform = transform
+
+        def __len__(self):
+            return len(self.base)
+
+        def __getitem__(self, idx):
+            img, label = self.base[idx]
+            if self.transform and isinstance(img, Image.Image):
+                img = self.transform(img)
+            return img, label
+
+    train_ds = TransformDataset(full_ds, train_transform)
+    logger.info(f"  Total training images: {len(train_ds)}")
+
+    mp_ctx = data_cfg.get("multiprocessing_context", "spawn") or None
+    mp_ctx = mp_ctx if num_workers > 0 else None
+    train_loader = DataLoader(
+        train_ds, batch_size=batch_size, shuffle=True,
+        num_workers=num_workers, pin_memory=(device == "cuda"),
+        drop_last=True,
+        persistent_workers=num_workers > 0,
+        multiprocessing_context=mp_ctx,
+    )
+    # Dummy val loader (not used for early stopping during finetuning)
+    val_loader = DataLoader(
+        train_ds, batch_size=batch_size, shuffle=False,
+        num_workers=num_workers, pin_memory=(device == "cuda"),
+        multiprocessing_context=mp_ctx,
+    )
+
+    # Create model
+    model = create_model(
+        name=model_cfg.get("name", "resnet18"),
+        num_classes=label_mapper.num_classes,
+        pretrained=False,
+        dropout=model_cfg.get("dropout", 0.3),
+        freeze_backbone=model_cfg.get("freeze_backbone", False),
+    )
+
+    # Load best weights as initialization
+    state = torch.load(weights_path, map_location="cpu", weights_only=True)
+    if "model_state_dict" in state:
+        state = state["model_state_dict"]
+    model.load_state_dict(state, strict=False)
+    logger.info(f"  Warm-started from {weights_path}")
+
+    # Loss (use same config as original training)
+    loss_cfg = training_cfg.get("loss", {})
+    loss_fn = create_loss_function(
+        name=loss_cfg.get("name", "cross_entropy"),
+        num_classes=label_mapper.num_classes,
+        class_weights=loss_cfg.get("class_weights", None),
+        label_smoothing=loss_cfg.get("label_smoothing", 0.0),
+        focal_gamma=loss_cfg.get("focal_gamma", 2.0),
+    )
+
+    # Optimizer with very low LR
+    optimizer = torch.optim.AdamW(model.parameters(), lr=finetune_lr, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=finetune_epochs, eta_min=1e-7
+    )
+
+    # Trainer
+    aug_cfg = data_cfg.get("augmentation", {})
+    trainer = Trainer(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        criterion=loss_fn,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        label_mapper=label_mapper,
+        device=device,
+        use_amp=(device == "cuda"),
+        config=config,
+        mixup_alpha=aug_cfg.get("mixup_alpha") or 0.0,
+        cutmix_alpha=aug_cfg.get("cutmix_alpha") or 0.0,
+    )
+
+    # Minimal callbacks — no early stopping during finetuning
+    checkpoint = ModelCheckpoint(
+        save_dir=str(output_path.parent / "retrain_checkpoints"),
+        save_top_k=1,
+        monitor="train_loss",
+        mode="min",
+    )
+
+    logger.info("  Starting retraining...")
+    trainer.fit(
+        epochs=finetune_epochs,
+        early_stopping=None,
+        checkpoint=checkpoint,
+        logger_callback=None,
+        output_dir=str(output_path.parent),
+    )
+
+    # Save the retrained model
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save({"model_state_dict": model.state_dict()}, output_path)
+    logger.info(f"  Retrained model saved to {output_path}")
+    logger.info("=" * 60)
+
+    return output_path
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Prepare submission package for weather classification competition"
@@ -244,6 +439,26 @@ def main():
         "--skip_checks", action="store_true",
         help="Skip pre-submission validation"
     )
+    parser.add_argument(
+        "--retrain_on_full", action="store_true",
+        help="Retrain on combined train+val+holdout before packaging"
+    )
+    parser.add_argument(
+        "--retrain_epochs", type=int, default=5,
+        help="Number of epochs for retrain-on-full (default: 5)"
+    )
+    parser.add_argument(
+        "--retrain_lr", type=float, default=1e-5,
+        help="Learning rate for retrain-on-full (default: 1e-5)"
+    )
+    parser.add_argument(
+        "--config", type=str, default=None,
+        help="Path to model config YAML (required for --retrain_on_full)"
+    )
+    parser.add_argument(
+        "--data_dir", type=str, nargs="+", default=None,
+        help="Data directories for retrain-on-full (default: data/train data/val data/holdout)"
+    )
     args = parser.parse_args()
 
     weights_path = Path(args.weights)
@@ -262,6 +477,42 @@ def main():
     label_mapping_dict = label_mapper.idx_to_label
     # Convert int keys back (JSON stores them as strings)
     label_mapping_dict = {int(k): v for k, v in label_mapping_dict.items()}
+
+    # --- Retrain on full data (optional) ---
+    if args.retrain_on_full:
+        import yaml as _yaml_lib
+
+        if not args.config:
+            logger.error("--config is required when using --retrain_on_full")
+            sys.exit(1)
+
+        config_path = Path(args.config)
+        if not config_path.exists():
+            logger.error(f"Config file not found: {config_path}")
+            sys.exit(1)
+        with open(config_path, encoding="utf-8") as f:
+            config = _yaml_lib.safe_load(f)
+
+        data_dirs = args.data_dir or ["data/train", "data/val", "data/holdout"]
+        # Only include directories that exist
+        data_dirs = [d for d in data_dirs if Path(d).is_dir()]
+        if not data_dirs:
+            logger.error("No data directories found for retrain-on-full")
+            sys.exit(1)
+
+        retrain_weights = output_dir / f"retrained_{weights_path.name}"
+        retrain_on_full_data(
+            weights_path=weights_path,
+            config=config,
+            data_dirs=data_dirs,
+            label_mapper=label_mapper,
+            output_path=retrain_weights,
+            finetune_epochs=args.retrain_epochs,
+            finetune_lr=args.retrain_lr,
+        )
+        # Use the retrained weights for the submission package
+        weights_path = retrain_weights
+        logger.info("Switching to retrained weights for submission package")
 
     # Prepare output directory
     output_dir.mkdir(parents=True, exist_ok=True)

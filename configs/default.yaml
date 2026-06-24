@@ -5,8 +5,10 @@
 data:
   train_dir: "data/train"
   val_dir: "data/val"     # If null, auto-split from train with stratified dedup split
+  holdout_dir: "data/holdout"  # Held-out data, NEVER used during training or tuning
   test_dir: "data/test"
-  val_split: 0.2          # Fraction of training data to use for validation
+  val_split: 0.15         # Fraction of training data to use for validation
+  holdout_split: 0.15     # Fraction reserved for final holdout evaluation
   num_workers: 1           # 0 = single-process; >0 uses spawn (avoids WSL2 deadlocks)
   multiprocessing_context: "spawn"  # spawn = fresh subprocesses (safe for WSL2 / CUDA)
   pin_memory: false        # false = no benefit on CPU
@@ -66,7 +68,7 @@ training:
   loss:
     name: "cross_entropy"  # Options: cross_entropy, focal, label_smoothing
     label_smoothing: 0.0   # Only used when name='label_smoothing'; ignored by cross_entropy/focal
-    # class_weights: [1.0, 1.2, 1.0, 0.8]   # per-class weights for imbalanced data
+    # class_weights: [1.0, 1.2, 1.0, 0.8]   # per-class weights for imbalanced data (use with caution)
     # focal_gamma: 2.0                       # focusing parameter (focal loss only)
   early_stopping:
     patience: 10
@@ -76,7 +78,7 @@ training:
     monitor: "val_macro_f1"
     mode: "max"
   sampler:
-    name: "none"            # Options: none, class_balanced
+    name: "none"            # Options: none, class_balanced (exp_042: CE 0.9059 vs none 0.9106, not recommended)
   ema:
     enabled: false
     decay: 0.999

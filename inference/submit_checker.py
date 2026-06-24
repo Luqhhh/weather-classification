@@ -120,7 +120,7 @@ class SubmitChecker:
         if all_passed:
             logger.info("🎉 ALL CHECKS PASSED — Ready for submission!")
         else:
-            failed = [k for k, v in self.results.items() if not v.get("passed", True)]
+            failed = [k for k, v in self.results.items() if isinstance(v, dict) and not v.get("passed", True)]
             logger.error(f"❌ {len(failed)} CHECK(S) FAILED: {', '.join(failed)}")
             logger.error("Fix the issues above before submitting!")
         logger.info("=" * 60)
@@ -172,6 +172,16 @@ class SubmitChecker:
             return False, "Found CUDA references: " + "; ".join(suspicious)
         return True, "No CUDA-specific code detected"
 
+    # Pip package name → Python import name (common mismatches)
+    _PKG_TO_IMPORT = {
+        "Pillow": "PIL",
+        "pillow": "PIL",
+        "scikit-learn": "sklearn",
+        "opencv-python": "cv2",
+        "opencv-python-headless": "cv2",
+        "python-dateutil": "dateutil",
+    }
+
     def check_dependencies_installable(self) -> Tuple[bool, str]:
         """Check that dependencies can be installed."""
         req_path = self.submit_dir / "requirements.txt"
@@ -186,8 +196,9 @@ class SubmitChecker:
                 if not line or line.startswith("#"):
                     continue
                 pkg_name = re.split(r"[=<>~!]", line)[0].strip()
+                import_name = self._PKG_TO_IMPORT.get(pkg_name, pkg_name.replace("-", "_"))
                 try:
-                    importlib.import_module(pkg_name.replace("-", "_"))
+                    importlib.import_module(import_name)
                 except ImportError:
                     missing.append(pkg_name)
 

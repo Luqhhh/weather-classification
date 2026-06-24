@@ -527,18 +527,33 @@ def _build_train_sampler(
             class_counts[label_idx] += 1
             sample_labels.append(label_idx)
 
-        # Weight = 1 / count (inverse frequency)
+        # Weight = (1 / count) ^ effective_scale
+        #   effective_scale=1.0 → full inverse-frequency balancing
+        #   effective_scale=0.5 → sqrt balancing (mild)
+        #   effective_scale=0.0 → uniform (no balancing)
+        effective_scale = float(sampler_config.get("effective_scale", 1.0))
+        effective_scale = max(0.0, min(1.0, effective_scale))
+
         num_classes = len(class_counts)
-        class_weight = {
-            cls: 1.0 / max(count, 1) for cls, count in class_counts.items()
-        }
+        if effective_scale == 1.0:
+            class_weight = {
+                cls: 1.0 / max(count, 1) for cls, count in class_counts.items()
+            }
+        elif effective_scale == 0.0:
+            class_weight = {cls: 1.0 for cls in class_counts}
+        else:
+            class_weight = {
+                cls: (1.0 / max(count, 1)) ** effective_scale
+                for cls, count in class_counts.items()
+            }
 
         sample_weights = [class_weight[lbl] for lbl in sample_labels]
 
         logger.info(
             "Class-balanced sampler enabled: class_counts=%s, "
-            "class_weights={%s}, seed=%d",
+            "effective_scale=%.2f, class_weights={%s}, seed=%d",
             dict(class_counts),
+            effective_scale,
             ", ".join(
                 f"{base_dataset.label_mapper.decode(cls)}: {w:.6f}"
                 for cls, w in sorted(class_weight.items())
