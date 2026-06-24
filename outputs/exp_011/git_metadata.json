@@ -1,9 +1,0 @@
-{
-  "branch": "main",
-  "commit_hash": "d45ee75a",
-  "commit_message": "chore: move Phase 1 spec into experiments/lqh/",
-  "dirty": true,
-  "dirty_files": [
-    "?? experiments/phase1_loss_spec.md"
-  ]
-}
