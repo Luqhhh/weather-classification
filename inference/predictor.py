@@ -86,6 +86,30 @@ class WeatherPredictor:
             std=std,
         )
 
+    def predict_array(self, X: np.ndarray) -> str:
+        """Predict a single image from a numpy array (platform inference interface).
+
+        Compatible with the competition platform's calling convention:
+        ``X`` is read by ``cv2.imread`` → BGR, uint8, shape (H, W, 3).
+
+        Args:
+            X: np.ndarray from cv2.imread, BGR, uint8.
+
+        Returns:
+            Predicted class label as a string
+            (one of 'cloudy', 'rainy', 'snowy', 'sunny').
+        """
+        # cv2.imread returns BGR — convert to RGB for PIL / torchvision
+        X_rgb = X[:, :, ::-1]
+        img = Image.fromarray(X_rgb)
+        img_tensor = self.transform(img).unsqueeze(0).to(self.device)
+
+        with torch.no_grad():
+            logits = self.model(img_tensor)
+            pred_idx = torch.argmax(logits, dim=1).item()
+
+        return self.label_mapper.decode(pred_idx)
+
     def predict_file(self, image_path: Union[str, Path]) -> Dict:
         """Predict a single image file.
 

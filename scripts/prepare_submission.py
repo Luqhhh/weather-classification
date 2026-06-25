@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from data.label_mapping import load_label_mapping
 from inference.submit_checker import SubmitChecker
+from models.model_factory import MODEL_REGISTRY
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,11 +41,16 @@ SUBMIT_INFERENCE_TEMPLATE = '''#!/usr/bin/env python3
 """
 Weather Image Classification — Inference Script
 
-Reads images from the specified directory, produces a predictions CSV.
-Designed for CPU-only execution, ≤ 70 minutes runtime.
+Supports two usage modes:
 
-Usage:
-    python inference.py --input_dir /path/to/images --output predictions.csv
+1. Platform import (per-image scoring):
+       from inference import predict
+       label = predict(X)   # X: np.ndarray from cv2.imread, shape (H,W,3), BGR
+
+2. Standalone batch inference:
+       python inference.py --input_dir /path/to/images --output predictions.csv
+
+Designed for CPU-only execution, ≤ 70 minutes runtime.
 """
 
 import argparse
@@ -53,6 +59,7 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 from PIL import Image
@@ -63,6 +70,7 @@ from torchvision import transforms, models
 # ============================================================
 MODEL_NAME = "{model_name}"
 NUM_CLASSES = {num_classes}
+IN_FEATURES = {in_features}
 IMAGE_SIZE = {image_size}
 MEAN = {mean}
 STD = {std}
@@ -71,32 +79,39 @@ LABEL_MAPPING = {label_mapping}  # idx → class name
 # ============================================================
 
 
-def build_model(num_classes: int) -> nn.Module:
-    """Reconstruct the model architecture."""
-    # Strip classifier and add custom head
-    backbone = models.__dict__[MODEL_NAME](pretrained=False)
-    if hasattr(backbone, "fc"):
-        in_features = backbone.fc.in_features
-        backbone.fc = nn.Identity()
-    elif hasattr(backbone, "classifier"):
-        if isinstance(backbone.classifier, nn.Sequential):
-            # Find the last Linear layer
-            for layer in reversed(backbone.classifier):
-                if isinstance(layer, nn.Linear):
-                    in_features = layer.in_features
-                    break
-        backbone.classifier = nn.Identity()
-    else:
-        raise ValueError(f"Cannot determine in_features for {{MODEL_NAME}}")
+def build_model(num_classes: int, in_features: int) -> nn.Module:
+    """Reconstruct the model architecture.
 
-    model = nn.Sequential(
-        backbone,
-        nn.AdaptiveAvgPool2d((1, 1)),
-        nn.Flatten(),
-        nn.Dropout(0.0),
-        nn.Linear(in_features, num_classes),
-    )
-    return model
+    Matches the WeatherClassifier structure used during training:
+        backbone → pool → dropout → fc → logits
+    """
+    backbone = models.__dict__[MODEL_NAME](pretrained=False)
+
+    # Strip the original classification head
+    if hasattr(backbone, "classifier"):
+        backbone.classifier = nn.Identity()
+    if hasattr(backbone, "fc"):
+        backbone.fc = nn.Identity()
+
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.backbone = backbone
+            self.pool = nn.AdaptiveAvgPool2d((1, 1))
+            self.dropout = nn.Dropout(p=0.0)
+            self.fc = nn.Linear(in_features, num_classes)
+
+        def forward(self, x):
+            features = self.backbone(x)
+            if isinstance(features, tuple):
+                features = features[-1]
+            if features.dim() == 4:
+                features = self.pool(features)
+                features = features.view(features.size(0), -1)
+            features = self.dropout(features)
+            return self.fc(features)
+
+    return Model()
 
 
 def get_transform() -> transforms.Compose:
@@ -108,23 +123,60 @@ def get_transform() -> transforms.Compose:
     ])
 
 
+# ============================================================
+# Module-level model loading — runs once on import
+# ============================================================
+_device = torch.device("cpu")
+_transform = get_transform()
+
+_model = build_model(NUM_CLASSES, IN_FEATURES)
+_state = torch.load(WEIGHTS_FILE, map_location="cpu", weights_only=True)
+
+# Handle wrapped checkpoint format
+if "model_state_dict" in _state:
+    _state = _state["model_state_dict"]
+
+# Auto-detect FP16 weights → convert to FP32 for CPU inference
+_sample_key = next(iter(_state.keys()))
+if isinstance(_state[_sample_key], torch.Tensor) and _state[_sample_key].dtype == torch.float16:
+    _state = {{k: v.float() for k, v in _state.items()}}
+
+_model.load_state_dict(_state)
+_model = _model.to(_device)
+_model.eval()
+
+
+def predict(X: np.ndarray) -> str:
+    """Platform inference interface — called once per image by the scoring system.
+
+    Args:
+        X: np.ndarray from ``cv2.imread`` — BGR, uint8, shape (H, W, 3).
+
+    Returns:
+        Predicted weather class label: 'cloudy', 'rainy', 'snowy', or 'sunny'.
+    """
+    # cv2.imread returns BGR — convert to RGB for PIL / torchvision
+    X_rgb = X[:, :, ::-1]
+    img = Image.fromarray(X_rgb)
+    img_tensor = _transform(img).unsqueeze(0).to(_device)
+
+    with torch.no_grad():
+        logits = _model(img_tensor)
+        pred_idx = torch.argmax(logits, dim=1).item()
+
+    return LABEL_MAPPING[pred_idx]
+
+
+# ============================================================
+# Batch inference (standalone CLI usage)
+# ============================================================
+
 def predict_images(
     input_dir: str,
     output_csv: str,
     batch_size: int = 32,
 ) -> None:
     """Predict classes for all images in a directory."""
-
-    device = torch.device("cpu")
-
-    # Load model
-    model = build_model(NUM_CLASSES)
-    state = torch.load(WEIGHTS_FILE, map_location="cpu", weights_only=True)
-    model.load_state_dict(state)
-    model = model.to(device)
-    model.eval()
-
-    transform = get_transform()
 
     # Find images
     extensions = {{".jpg", ".jpeg", ".png", ".bmp", ".webp"}}
@@ -144,14 +196,14 @@ def predict_images(
         batch_tensors = []
         for path in batch_paths:
             img = Image.open(path).convert("RGB")
-            img_tensor = transform(img)
+            img_tensor = _transform(img)
             batch_tensors.append(img_tensor)
 
-        batch = torch.stack(batch_tensors).to(device)
+        batch = torch.stack(batch_tensors).to(_device)
 
         # Predict
         with torch.no_grad():
-            logits = model(batch)
+            logits = _model(batch)
             preds = torch.argmax(logits, dim=1)
 
         for path, pred_idx in zip(batch_paths, preds):
@@ -459,6 +511,10 @@ def main():
         "--data_dir", type=str, nargs="+", default=None,
         help="Data directories for retrain-on-full (default: data/train data/val data/holdout)"
     )
+    parser.add_argument(
+        "--fp16", action="store_true",
+        help="Convert weights to FP16 (half precision) — halves file size, negligible accuracy impact"
+    )
     args = parser.parse_args()
 
     weights_path = Path(args.weights)
@@ -518,11 +574,20 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     logger.info(f"Preparing submission in {output_dir}/")
 
+    # Resolve in_features from model registry
+    if args.model not in MODEL_REGISTRY:
+        logger.error(
+            f"Unknown model '{args.model}'. Available: {list(MODEL_REGISTRY.keys())}"
+        )
+        sys.exit(1)
+    in_features = MODEL_REGISTRY[args.model]["in_features"]
+
     # 1. Generate inference script
     logger.info("Generating inference script...")
     inference_code = SUBMIT_INFERENCE_TEMPLATE.format(
         model_name=args.model,
         num_classes=label_mapper.num_classes,
+        in_features=in_features,
         image_size=args.image_size,
         mean="[0.485, 0.456, 0.406]",
         std="[0.229, 0.224, 0.225]",
@@ -535,10 +600,29 @@ def main():
         f.write(inference_code)
     logger.info(f"  Inference script: {inference_script}")
 
-    # 2. Copy weights
+    # 2. Copy weights (and optionally convert to FP16)
     logger.info("Copying model weights...")
     weights_dest = output_dir / weights_path.name
     shutil.copy2(weights_path, weights_dest)
+
+    if args.fp16:
+        logger.info("Converting weights to FP16...")
+        state = torch.load(weights_dest, map_location="cpu", weights_only=True)
+
+        def _to_half(d):
+            return {
+                k: v.half() if isinstance(v, torch.Tensor) and v.is_floating_point() else v
+                for k, v in d.items()
+            }
+
+        if isinstance(state, dict) and "model_state_dict" in state:
+            state["model_state_dict"] = _to_half(state["model_state_dict"])
+        elif isinstance(state, dict):
+            state = _to_half(state)
+
+        torch.save(state, weights_dest)
+        logger.info("  FP16 conversion complete")
+
     weight_size_mb = weights_dest.stat().st_size / (1024 * 1024)
     logger.info(f"  Weights: {weights_dest} ({weight_size_mb:.1f} MB)")
 
