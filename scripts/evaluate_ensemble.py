@@ -73,6 +73,36 @@ def _create_model(config: dict, num_classes: int, device: str) -> torch.nn.Modul
     return model.to(device).eval()
 
 
+def _build_member_datasets(
+    data_dir: str | Path,
+    label_mapper,
+    configs: List[dict],
+) -> List[WeatherDataset]:
+    datasets = []
+    for config in configs:
+        data_cfg = config.get("data", {})
+        image_size = data_cfg.get("image_size", 224)
+        mean = tuple(data_cfg.get("mean", [0.485, 0.456, 0.406]))
+        std = tuple(data_cfg.get("std", [0.229, 0.224, 0.225]))
+        transform = build_transforms(
+            mode="val", image_size=image_size, mean=mean, std=std
+        )
+        datasets.append(
+            WeatherDataset(
+                data_dir=data_dir, transform=transform, label_mapper=label_mapper
+            )
+        )
+
+    if datasets:
+        reference = datasets[0].images
+        for index, dataset in enumerate(datasets[1:], start=2):
+            if dataset.images != reference:
+                raise RuntimeError(
+                    f"Member dataset {index} image order differs from member dataset 1"
+                )
+    return datasets
+
+
 def _ensemble_config(base_config: dict, members: List[Dict]) -> dict:
     config = dict(base_config)
     config["model"] = dict(config.get("model", {}))
@@ -141,11 +171,8 @@ def main() -> None:
         models.append(model)
         logger.info("Loaded member: %s", member["weights"])
 
-    image_size = data_cfg.get("image_size", 224)
-    mean = tuple(data_cfg.get("mean", [0.485, 0.456, 0.406]))
-    std = tuple(data_cfg.get("std", [0.229, 0.224, 0.225]))
-    transform = build_transforms(mode="val", image_size=image_size, mean=mean, std=std)
-    dataset = WeatherDataset(data_dir=data_dir, transform=transform, label_mapper=label_mapper)
+    datasets = _build_member_datasets(data_dir, label_mapper, configs)
+    dataset = datasets[0]
 
     from torch.utils.data import DataLoader
 
@@ -154,14 +181,17 @@ def main() -> None:
         num_workers = data_cfg.get("num_workers", 0)
     mp_ctx = data_cfg.get("multiprocessing_context", "spawn") or None
     mp_ctx = mp_ctx if num_workers > 0 else None
-    loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        persistent_workers=num_workers > 0,
-        multiprocessing_context=mp_ctx,
-    )
+    loaders = [
+        DataLoader(
+            member_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            persistent_workers=num_workers > 0,
+            multiprocessing_context=mp_ctx,
+        )
+        for member_dataset in datasets
+    ]
 
     all_preds = []
     all_labels = []
@@ -173,9 +203,17 @@ def main() -> None:
     with torch.no_grad():
         from tqdm import tqdm
 
-        for images, labels in tqdm(loader, desc="Evaluating ensemble"):
-            images = images.to(args.device)
-            logits_stack = torch.stack([model(images) for model in models])
+        for batches in tqdm(
+            zip(*loaders), total=len(loaders[0]), desc="Evaluating ensemble"
+        ):
+            labels = batches[0][1]
+            logits_per_member = []
+            for model, (images, member_labels) in zip(models, batches):
+                if not torch.equal(member_labels, labels):
+                    raise RuntimeError("Member DataLoader label order mismatch")
+                images = images.to(args.device)
+                logits_per_member.append(model(images))
+            logits_stack = torch.stack(logits_per_member)
             logits = (logits_stack * weights.view(-1, 1, 1)).sum(dim=0)
             probs = torch.softmax(logits, dim=1)
             preds = torch.argmax(probs, dim=1)

@@ -34,47 +34,67 @@ class WeatherClassifier(nn.Module):
         return self.fc(features)
 
 
-# 构建 backbone（去掉原始分类头）
-backbone = models.convnext_tiny(pretrained=False)
-backbone.classifier = nn.Identity()
+def _build_model():
+    backbone = models.convnext_tiny(pretrained=False)
+    backbone.classifier = nn.Identity()
+    return WeatherClassifier(backbone, num_classes=4, dropout=0.3).to(device).eval()
 
-# 加载模型
-model = WeatherClassifier(backbone, num_classes=4, dropout=0.3)
+
+def _preprocess(X, im_size):
+    X = X[:, :, ::-1]
+    X = cv2.resize(X, (im_size, im_size))
+    X = X.astype(np.float32) / 255.0
+    X = (X - MEAN) / STD
+    X = np.transpose(X, (2, 0, 1))
+    return torch.from_numpy(X).unsqueeze(0).to(device)
+
+
+# ---- 加载模型 ----
 state = torch.load(MODEL_PATH, map_location='cpu', weights_only=True)
 
-# 处理 wrapped checkpoint 格式
-if "model_state_dict" in state:
-    state = state["model_state_dict"]
+_ensemble_mode = False
+_models = []
+_weights = []
+_image_sizes = []
 
-model.load_state_dict(state)
-model = model.to(device)
-model.eval()
+if isinstance(state, dict) and state.get('type') == 'logits_ensemble':
+    # Ensemble 模式：加载多个子模型
+    _ensemble_mode = True
+    for m in state['members']:
+        model = _build_model()
+        model.load_state_dict(m['state_dict'])
+        _models.append(model)
+        _weights.append(m['weight'])
+        _image_sizes.append(m.get('image_size', IM_SIZE))
+else:
+    # 单模型模式
+    if isinstance(state, dict) and "model_state_dict" in state:
+        state = state["model_state_dict"]
+    model = _build_model()
+    model.load_state_dict(state)
+    _models = [model]
+    _weights = [1.0]
+    _image_sizes = [IM_SIZE]
 
 
 def predict(X):
     """
     模型预测
     param：
-        X : np.ndarray，由 cv2.imread 读取的图片数据，shape(224,224,3)。
+        X : np.ndarray，由 cv2.imread 读取的图片数据，shape(H,W,3)。
     return：
         y_predict : str, 数据 label，取值为 'sunny', 'cloudy', 'rainy', 'snowy' 之一。
     """
-    # cv2.imread 返回 BGR → 转为 RGB（模型用 PIL/RGB 训练）
-    X = X[:, :, ::-1]
+    logits_sum = None
 
-    # 缩放到模型输入尺寸
-    X = cv2.resize(X, (IM_SIZE, IM_SIZE))
+    for model, weight, im_size in zip(_models, _weights, _image_sizes):
+        x = _preprocess(X, im_size)
+        with torch.no_grad():
+            logits = model(x)
+        if logits_sum is None:
+            logits_sum = logits * weight
+        else:
+            logits_sum += logits * weight
 
-    # 归一化：uint8 → float32 [0,1] → ImageNet 标准化
-    X = X.astype(np.float32) / 255.0
-    X = (X - MEAN) / STD
-
-    # HWC → CHW → 加 batch 维
-    X = np.transpose(X, (2, 0, 1))
-    X = torch.from_numpy(X).unsqueeze(0).to(device)
-
-    with torch.no_grad():
-        logits = model(X)
-        pred_idx = torch.argmax(logits, dim=1).item()
-
+    pred_idx = torch.argmax(logits_sum, dim=1).item()
     return LABELS[pred_idx]

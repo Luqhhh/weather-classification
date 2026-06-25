@@ -4,13 +4,17 @@
 
 ## 当前结论
 
-### 已完成实验 001-009
+### 已完成实验 001-013
 
 | Experiment | 关键配置 | Local val | Local holdout | Official test | 判断 |
 |------------|----------|----------:|--------------:|--------------:|------|
 | official_009 | 224, tight crop, old `exp_054` warm-start, EMA, lr=3e-5 | 0.9509 | 0.9412 | **0.9373** | 当前主候选 |
+| official_013 | `0.7 * official_009 + 0.3 * official_004` logits ensemble | 0.9551 | **0.9524** | 待提交 | 本地最高，2x 推理成本 |
+| official_011 | official_007 top-3 checkpoint averaging | 0.9347 | **0.9507** | 待提交 | 本地最高单权重 |
+| official_012 | `0.8 * official_009 + 0.2 * official_004` logits ensemble | 0.9535 | **0.9499** | 待提交 | 稳定但低于 013 |
 | official_004 | official_002 top-3 checkpoint averaging | - | 0.9315 | **0.9315** | averaging 被本地 holdout 低估，值得继续 |
 | official_007 | 224, tight crop, ImageNet init, EMA | 0.9380 | **0.9456** | 0.9252 | 本地最强但平台掉点 |
+| official_010 | official_009 top-3 checkpoint averaging | 0.9484 | 0.9412 | 待提交 | 未提升 009 holdout |
 | official_008 | 320, tight crop, ImageNet init, EMA | 0.9375 | 0.9399 | 0.9196 | 320 未超过 224 |
 | official_005 | 320, wd=5e-4, EMA | 0.9400 | 0.9142 | 0.9188 | 低 wd + EMA 不稳 |
 | official_003 | 320, 标准 rotation/CJ, EMA | 0.9450 | 0.9246 | 0.9158 | 标准增强不稳 |
@@ -22,6 +26,8 @@
 
 - `official_009` 的旧数据 warm-start 是最大正信号，后续优先围绕它做 averaging、seed 和 lr 小矩阵。
 - `official_004` 说明 checkpoint averaging 对平台 test 可能有帮助，不能只按本地 holdout 淘汰。
+- `official_011` 是当前本地 holdout 最高的单权重模型；`official_013` 是当前本地 holdout 最高整体模型，但需要 2x 推理和平台 test 确认。
+- `official_010` 没有改善 `official_009` 的 holdout，warm-start top-3 averaging 暂不作为主线。
 - 224 + tight crop 已经足够；320 没有显示稳定收益，推理成本还更高。
 - 标准 rotation / stronger color jitter、低 weight decay、384/512、TTA、cutout 暂不继续。
 - rainy/snowy 当前不是明显弱类，暂不做 weighted CE / focal / sampler。
@@ -32,10 +38,10 @@
 
 | 优先级 | 临时 ID | 实验 | 配置 | 目的 | 状态 |
 |--------|---------|------|------|------|------|
-| 1 | official_010 | warm-start top-3 averaging | 对 `official_009` 的 top-3 checkpoints 做 weight averaging | 验证 averaging 能否叠加到当前平台第一的 warm-start 路线 | todo |
-| 2 | official_011 | 224 tight crop top-3 averaging | 对 `official_007` 的 top-3 checkpoints 做 weight averaging | 得到一个非 warm-start 的 224 稳健备选 | todo |
-| 3 | official_012 | logits ensemble 009/004 A | `0.8 * official_009 + 0.2 * official_004` | 轻量融合 warm-start 与 averaging 分支，控制 004 权重 | todo |
-| 4 | official_013 | logits ensemble 009/004 B | `0.7 * official_009 + 0.3 * official_004` | 提高 004 互补分支占比，检查平台 test 上限 | todo |
+| 1 | official_010 | warm-start top-3 averaging | 对 `official_009` 的 top-3 checkpoints 做 weight averaging | 验证 averaging 能否叠加到当前平台第一的 warm-start 路线 | done: val 0.9484 / holdout 0.9412 |
+| 2 | official_011 | 224 tight crop top-3 averaging | 对 `official_007` 的 top-3 checkpoints 做 weight averaging | 得到一个非 warm-start 的 224 稳健备选 | done: val 0.9347 / holdout 0.9507 |
+| 3 | official_012 | logits ensemble 009/004 A | `0.8 * official_009 + 0.2 * official_004` | 轻量融合 warm-start 与 averaging 分支，控制 004 权重 | done: val 0.9535 / holdout 0.9499 |
+| 4 | official_013 | logits ensemble 009/004 B | `0.7 * official_009 + 0.3 * official_004` | 提高 004 互补分支占比，检查平台 test 上限 | done: val 0.9551 / holdout 0.9524 |
 
 判断标准：
 
@@ -86,8 +92,8 @@
 
 ## 下一步执行顺序
 
-1. 跑 `official_010`。
-2. 跑 `official_011`。
-3. 跑 `official_012` 和 `official_013`，只提交两种固定权重。
-4. 若 `official_010/012/013` 没超过 `official_009`，再启动 `official_014/015/016`，并补 `official_019/020/021`。
+1. 优先把 `official_011` 提交平台 test，验证本地最高单权重是否迁移。
+2. 若平台推理时间允许，再提交 `official_013`；`official_012` 作为 013 的低 004 权重对照。
+3. `official_010` 暂不优先提交，除非需要验证 warm-start averaging 的平台一致性。
+4. 若 `official_011/013` 平台 test 没超过 `official_009`，再启动 `official_014/015/016`，并补 `official_019/020/021`。
 5. 每批结束后同步 `experiments/official_leaderboard.md` 和 `experiments/officialTestScore.md`，不要只更新本文件。

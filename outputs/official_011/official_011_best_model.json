@@ -1,0 +1,19 @@
+{
+  "output": "outputs/official_011/official_011_best_model.pth",
+  "metric": "val_macro_f1",
+  "mode": "max",
+  "checkpoints": [
+    {
+      "path": "outputs/official_007/checkpoints/epoch_023_val_macro_f1_0.9366.pth",
+      "val_macro_f1": 0.9366
+    },
+    {
+      "path": "outputs/official_007/checkpoints/epoch_024_val_macro_f1_0.9367.pth",
+      "val_macro_f1": 0.9367
+    },
+    {
+      "path": "outputs/official_007/checkpoints/epoch_033_val_macro_f1_0.9380.pth",
+      "val_macro_f1": 0.938
+    }
+  ]
+}

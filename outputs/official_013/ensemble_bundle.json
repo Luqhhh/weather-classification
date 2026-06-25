@@ -1,0 +1,18 @@
+{
+  "type": "logits_ensemble",
+  "members": [
+    {
+      "source": "outputs/official_009/best_model.pth",
+      "weight": 0.7
+    },
+    {
+      "source": "outputs/official_004/best_model.pth",
+      "weight": 0.3
+    }
+  ],
+  "inference": {
+    "model": "convnext_tiny",
+    "image_size": 224,
+    "input_size_004": 320
+  }
+}
