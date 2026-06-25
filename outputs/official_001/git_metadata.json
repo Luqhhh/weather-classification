@@ -1,0 +1,13 @@
+{
+  "branch": "main",
+  "commit_hash": "a9f43af9",
+  "commit_message": "chore: add gitignore rules for old data, old outputs, and submission artifacts",
+  "dirty": true,
+  "dirty_files": [
+    "?? data/holdout/",
+    "?? data/train.zip",
+    "?? data/train/",
+    "?? data/val/",
+    "?? outputs/official_001/"
+  ]
+}
