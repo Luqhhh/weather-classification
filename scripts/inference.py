@@ -93,14 +93,6 @@ def main():
     state = torch.load(args.weights, map_location="cpu", weights_only=True)
     if "model_state_dict" in state:
         state = state["model_state_dict"]
-
-    # Auto-detect FP16 weights → convert to FP32
-    sample = next(iter(state.values()))
-    if isinstance(sample, torch.Tensor) and sample.dtype == torch.float16:
-        logger.info("Detected FP16 weights — converting to FP32")
-        state = {k: v.float() if isinstance(v, torch.Tensor) else v
-                 for k, v in state.items()}
-
     model.load_state_dict(state)
     logger.info(f"Loaded weights from {args.weights}")
 

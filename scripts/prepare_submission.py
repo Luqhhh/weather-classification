@@ -136,11 +136,6 @@ _state = torch.load(WEIGHTS_FILE, map_location="cpu", weights_only=True)
 if "model_state_dict" in _state:
     _state = _state["model_state_dict"]
 
-# Auto-detect FP16 weights → convert to FP32 for CPU inference
-_sample_key = next(iter(_state.keys()))
-if isinstance(_state[_sample_key], torch.Tensor) and _state[_sample_key].dtype == torch.float16:
-    _state = {{k: v.float() for k, v in _state.items()}}
-
 _model.load_state_dict(_state)
 _model = _model.to(_device)
 _model.eval()
@@ -511,10 +506,6 @@ def main():
         "--data_dir", type=str, nargs="+", default=None,
         help="Data directories for retrain-on-full (default: data/train data/val data/holdout)"
     )
-    parser.add_argument(
-        "--fp16", action="store_true",
-        help="Convert weights to FP16 (half precision) — halves file size, negligible accuracy impact"
-    )
     args = parser.parse_args()
 
     weights_path = Path(args.weights)
@@ -600,29 +591,10 @@ def main():
         f.write(inference_code)
     logger.info(f"  Inference script: {inference_script}")
 
-    # 2. Copy weights (and optionally convert to FP16)
+    # 2. Copy weights
     logger.info("Copying model weights...")
     weights_dest = output_dir / weights_path.name
     shutil.copy2(weights_path, weights_dest)
-
-    if args.fp16:
-        logger.info("Converting weights to FP16...")
-        state = torch.load(weights_dest, map_location="cpu", weights_only=True)
-
-        def _to_half(d):
-            return {
-                k: v.half() if isinstance(v, torch.Tensor) and v.is_floating_point() else v
-                for k, v in d.items()
-            }
-
-        if isinstance(state, dict) and "model_state_dict" in state:
-            state["model_state_dict"] = _to_half(state["model_state_dict"])
-        elif isinstance(state, dict):
-            state = _to_half(state)
-
-        torch.save(state, weights_dest)
-        logger.info("  FP16 conversion complete")
-
     weight_size_mb = weights_dest.stat().st_size / (1024 * 1024)
     logger.info(f"  Weights: {weights_dest} ({weight_size_mb:.1f} MB)")
 

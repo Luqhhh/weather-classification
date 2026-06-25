@@ -440,19 +440,6 @@ def _extract_model_state(state: dict) -> dict:
     return state
 
 
-def _auto_convert_fp16(state: dict) -> dict:
-    """Convert FP16 tensors to FP32 for CPU inference.
-
-    FP16 weights halve file size; converting to FP32 at load time
-    ensures the model runs in full precision with negligible accuracy impact.
-    """
-    sample = next(iter(state.values()))
-    if isinstance(sample, torch.Tensor) and sample.dtype == torch.float16:
-        logger.info("Detected FP16 weights — converting to FP32")
-        return {k: v.float() if isinstance(v, torch.Tensor) else v
-                for k, v in state.items()}
-    return state
-
 
 def _load_initial_weights(
     model: torch.nn.Module,
@@ -467,7 +454,6 @@ def _load_initial_weights(
     except TypeError:
         state = torch.load(weights_path, map_location="cpu")
     state = _extract_model_state(state)
-    state = _auto_convert_fp16(state)
     incompatible = model.load_state_dict(state, strict=strict)
     if not strict:
         logger.info(
