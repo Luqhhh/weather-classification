@@ -1,0 +1,16 @@
+{
+  "branch": "main",
+  "commit_hash": "abf6a6ce",
+  "commit_message": "feat: add official competition dataset with 70/15/15 split",
+  "dirty": true,
+  "dirty_files": [
+    "?? outputs/convnext_tiny_1782361869/",
+    "?? outputs/exp_019/",
+    "?? outputs/exp_020/",
+    "?? outputs/exp_026/",
+    "?? outputs/exp_026_aborted_bs32_stuck/",
+    "?? outputs/exp_027/",
+    "?? outputs/exp_028/",
+    "?? outputs/exp_029/"
+  ]
+}
