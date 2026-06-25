@@ -1,0 +1,18 @@
+{
+  "branch": "main",
+  "commit_hash": "02cb1f6e",
+  "commit_message": "chore: add official 022 experiment results",
+  "dirty": true,
+  "dirty_files": [
+    "?? _tmp_official_018.yaml",
+    "?? _tmp_official_019.yaml",
+    "?? _tmp_official_020.yaml",
+    "?? _tmp_official_021.yaml",
+    "?? _tmp_official_022.yaml",
+    "?? _tmp_official_023.yaml",
+    "?? official_best_models/",
+    "?? outputs/exp_019/",
+    "?? outputs/exp_020/",
+    "?? outputs/exp_026/"
+  ]
+}
