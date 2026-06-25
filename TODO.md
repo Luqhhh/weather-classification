@@ -1,179 +1,93 @@
-# 比赛数据集发布后优先实验 TODO
+# 官方数据阶段 TODO
 
-> 目标：先验证当前最强结论能否迁移到正式比赛数据集，再决定是否扩大搜索。不要一上来重扫 dropout、backbone 或强增强。
+> 当前目标：围绕平台 test 已验证的正信号继续小矩阵优化。不要再按本地 val/holdout 单独排序扩大搜索；本地指标只作为 guardrail，平台 test 反馈是当前最接近目标域的信号。
 
-## P0 - 数据落地与验证集切分
+## 当前结论
 
-> **本地已完成**: 旧数据已重切为 70/15/15 三层结构（`data/train` / `data/val` / `data/holdout`），
-> SHA-256 全局去重，seed=42 分层抽样。Holdout 上 exp_054 vs exp_044 已验证排序和 val 一致（差 < 0.001）。
-> 工具脚本：`scripts/split_data.py`（从任意目录重建切分）、`scripts/organize_datasets.py`（从 Kaggle 原始数据走全流程）。
+### 已完成实验 001-009
 
-- [ ] 导入官方训练/测试数据，确认目录结构、类别名、样本数和图像可读性。
-- [ ] **用 `scripts/split_data.py` 重建三层切分**（`--source <官方数据目录> --output_dir data --seed 42`），自动完成 hash 去重、leakage 检查和 stratified split。
-- [ ] 确认 `data/holdout/` 已生成且各类样本数合理（rainy/snowy 至少 > 200）。
-- [ ] 记录每类样本数和 splits 各类 support，重点观察 `rainy` / `snowy` 是否仍是弱类。
+| Experiment | 关键配置 | Local val | Local holdout | Official test | 判断 |
+|------------|----------|----------:|--------------:|--------------:|------|
+| official_009 | 224, tight crop, old `exp_054` warm-start, EMA, lr=3e-5 | 0.9509 | 0.9412 | **0.9373** | 当前主候选 |
+| official_004 | official_002 top-3 checkpoint averaging | - | 0.9315 | **0.9315** | averaging 被本地 holdout 低估，值得继续 |
+| official_007 | 224, tight crop, ImageNet init, EMA | 0.9380 | **0.9456** | 0.9252 | 本地最强但平台掉点 |
+| official_008 | 320, tight crop, ImageNet init, EMA | 0.9375 | 0.9399 | 0.9196 | 320 未超过 224 |
+| official_005 | 320, wd=5e-4, EMA | 0.9400 | 0.9142 | 0.9188 | 低 wd + EMA 不稳 |
+| official_003 | 320, 标准 rotation/CJ, EMA | 0.9450 | 0.9246 | 0.9158 | 标准增强不稳 |
+| official_001 | 320, old exp054-style, EMA | 0.9366 | 0.9376 | 0.9147 | 平台 test 弱 |
+| official_002 | 320, no EMA, wd=0.05 | 0.9371 | 0.9287 | 0.9059 | 不作主线 |
+| official_006 | 320, no EMA, wd=5e-4 | 0.9301 | 0.9291 | 0.9034 | 不作主线 |
 
-完成标准：
+### 当前判断
 
-- `data/train`、`data/val`、`data/holdout`、`data/test` 可被现有 dataloader 直接读取。
-- 有明确的 class distribution、重复样本检查结论和 split seed。
-- val 和 holdout 上模型排名一致（差 < 0.002）才进入后续实验。
-- 不用当前旧 validation set 的排序直接决定最终提交。
+- `official_009` 的旧数据 warm-start 是最大正信号，后续优先围绕它做 averaging、seed 和 lr 小矩阵。
+- `official_004` 说明 checkpoint averaging 对平台 test 可能有帮助，不能只按本地 holdout 淘汰。
+- 224 + tight crop 已经足够；320 没有显示稳定收益，推理成本还更高。
+- 标准 rotation / stronger color jitter、低 weight decay、384/512、TTA、cutout 暂不继续。
+- rainy/snowy 当前不是明显弱类，暂不做 weighted CE / focal / sampler。
 
-## P1 - 第一批必须跑的主线实验
+## P0 - 低成本后处理优先
 
-优先只跑 ConvNeXt-Tiny 320，因为当前本地实验显示普通单点搜索已经收敛，提升主要来自权重平滑。
-
-| 优先级 | 临时 ID | 实验 | 配置 | 目的 |
-|--------|---------|------|------|------|
-| 1 | official_001 | 主候选复现 | ConvNeXt-Tiny 320, CE, dropout=0.3, wd=0.05, EMA=0.999, no rotation, light CJ, seed=42 | 验证 `exp_054` 结论是否迁移 |
-| 2 | official_002 | 同配置 plain checkpoint | ConvNeXt-Tiny 320, CE, dropout=0.3, wd=0.05, no EMA, no rotation, light CJ, seed=42 | 量化 EMA 相对普通 checkpoint 的收益 |
-| 3 | official_003 | EMA + 标准增强（exp_044 复现） | ConvNeXt-Tiny 320, CE, dropout=0.3, wd=0.05, EMA=0.999, **默认 rotation + 默认 CJ**, seed=42 | 量化保守增强 vs 标准增强的收益（对比 official_001） |
-| 4 | official_004 | 同配置 top-k averaging | 基于 official_001/002 的 top-3 checkpoints | 检查 checkpoint averaging 是否仍有效 |
-| 5 | official_005 | 低 wd + EMA | ConvNeXt-Tiny 320, CE, dropout=0.3, wd=5e-4, EMA=0.999, seed=42 | 验证 `exp_050/051` 低 wd 路线是否迁移 |
-| 6 | official_006 | 低 wd plain 对照 | ConvNeXt-Tiny 320, CE, dropout=0.3, wd=5e-4, no EMA, seed=42 | 分清低 wd 本身收益和权重平滑收益 |
-
-> **为什么加 official_003**：当前数据上 exp_044（EMA + 标准增强）= 0.9182 vs exp_054（EMA + 保守增强）= 0.9204，差了 0.002。需要在官方数据上确认保守增强的收益是否可复现，还是 EMA 本身贡献了大部分。
-
-## P1.5 - 官方 224 数据补充实验（当前新增）
-
-> 触发原因：官方目前只发布训练集，且当前 `data/train` / `data/val` / `data/holdout` 是从官方训练集切分出来的；图像尺寸全部为 224×224。旧 `exp_0xx` 权重是在旧数据集训练得到，只能作为迁移基线。先验证新数据上原生 224、收紧 crop、旧权重低学习率迁移是否更优。
+这些实验优先级最高，因为不需要重训或训练成本低，且直接验证平台 test 上的两个正信号：warm-start 和 checkpoint averaging。
 
 | 优先级 | 临时 ID | 实验 | 配置 | 目的 | 状态 |
 |--------|---------|------|------|------|------|
-| 1 | official_007 | 224 + tight crop 主线 | ConvNeXt-Tiny, CE, dropout=0.3, wd=0.05, EMA=0.999, image_size=224, RRC scale=[0.85,1.0], no rotation, light CJ, seed=42 | 验证官方 224 原图下是否应放弃 320 上采样 | done: val macro F1 0.9380 |
-| 2 | official_008 | 320 + tight crop 对照 | ConvNeXt-Tiny, CE, dropout=0.3, wd=0.05, EMA=0.999, image_size=320, RRC scale=[0.85,1.0], no rotation, light CJ, seed=42 | 分离“尺寸收益”和“crop 收紧收益” | done: val macro F1 0.9375 |
-| 3 | official_009 | 旧 exp_054 权重迁移微调 | 从 `outputs/old/exp_054/best_model.pth` 初始化，ConvNeXt-Tiny, image_size=224, tight crop, EMA=0.999, lr=3e-5, wd=0.05, seed=42 | 验证旧数据特征是否能帮助新数据收敛和泛化 | done: val macro F1 0.9509 |
+| 1 | official_010 | warm-start top-3 averaging | 对 `official_009` 的 top-3 checkpoints 做 weight averaging | 验证 averaging 能否叠加到当前平台第一的 warm-start 路线 | todo |
+| 2 | official_011 | 224 tight crop top-3 averaging | 对 `official_007` 的 top-3 checkpoints 做 weight averaging | 得到一个非 warm-start 的 224 稳健备选 | todo |
+| 3 | official_012 | logits ensemble 009/004 A | `0.8 * official_009 + 0.2 * official_004` | 轻量融合 warm-start 与 averaging 分支，控制 004 权重 | todo |
+| 4 | official_013 | logits ensemble 009/004 B | `0.7 * official_009 + 0.3 * official_004` | 提高 004 互补分支占比，检查平台 test 上限 | todo |
 
 判断标准：
 
-- 先看 val macro F1、rainy F1、snowy F1、confusion matrix；只把前 2 名拿到 holdout 确认。
-- 若 `official_007` 与 320 路线差距在 `0.002-0.004` 内，优先考虑 224，因为它贴合原图且 CPU 成本更低。
-- 若 `official_008` 明显超过 `official_001/007`，说明 tight crop 比尺寸本身更关键，后续固定收紧 crop。
-- 若 `official_009` 明显超过从 ImageNet 初始化的新训模型，后续把旧数据 checkpoint 作为 warm-start 路线；否则最终仍以新数据从 ImageNet 初始化为主。
-- 暂不加入 weighted CE / focal / sampler。旧数据中 weighted CE 效果不好；只有当新数据 val 上 rainy/snowy 明显弱于其他类时，再补不均衡实验。
+- `official_010` 若平台 test 超过 `official_009` 或接近且 holdout 更稳，作为下一版主候选。
+- `official_012/013` 若平台 test 提升小于 0.002，默认不承担 2x 推理成本，只作为分析参考。
+- logits ensemble 不要继续做大范围权重搜索；最多在 `0.8/0.2` 与 `0.7/0.3` 中选一个。
 
-当前结果：
+## P1 - warm-start / resize / 大模型小训练矩阵
 
-- `official_007`: 0.9380，224 + tight crop 新训；best per-class F1 = cloudy 0.9399 / rainy 0.9231 / snowy 0.9402 / sunny 0.9489。
-- `official_008`: 0.9375，320 + tight crop 新训；未超过 224，且训练/推理成本更高；best per-class F1 = cloudy 0.9425 / rainy 0.9008 / snowy 0.9508 / sunny 0.9559。
-- `official_009`: 0.9509，旧 `exp_054` warm-start + 224 tight crop，目前 val 第一；best per-class F1 = cloudy 0.9494 / rainy 0.9474 / snowy 0.9474 / sunny 0.9594。
-- 三条实验里 rainy/snowy 没有表现为明显弱类；暂不加 weighted CE / focal / sampler，优先对 `official_009` 和 `official_007` 做 holdout 复核。
+这些实验围绕当前主候选 `official_009` 做受控变化，同时加入一个 256 sanity check 和两个更高容量 backbone 探索。大模型实验不展开矩阵，先各跑一条判断是否值得继续。
 
-建议命令模板：
-
-```bash
-python3 scripts/train.py \
-  --config configs/models/convnext_tiny.yaml \
-  --output_dir outputs \
-  --experiment_id official_001 \
-  --notes "official data: ConvNeXt 320 CE d=0.3 wd=0.05 EMA=0.999 seed=42" \
-  -- \
-  --logging.experiment_name official_001 \
-  --data.image_size 320 \
-  --training.batch_size 32 \
-  --seed 42 \
-  --model.dropout 0.3 \
-  --training.loss.name cross_entropy \
-  --training.optimizer.weight_decay 0.05 \
-  --training.ema.enabled true \
-  --training.ema.decay 0.999 \
-  --data.augmentation.random_rotation.degrees 0 \
-  --data.augmentation.color_jitter '{"brightness":0.08,"contrast":0.08,"saturation":0.08,"hue":0.03}'
-```
+| 优先级 | 临时 ID | 实验 | 配置 | 目的 | 状态 |
+|--------|---------|------|------|------|------|
+| 1 | official_014 | warm-start seed 7 | `official_009` 配置，seed=7 | 判断 warm-start 是否稳定，不被 seed42 偶然性支配 | todo |
+| 2 | official_015 | warm-start seed 2026 | `official_009` 配置，seed=2026 | 与 014 一起估计 seed 方差 | todo |
+| 3 | official_016 | lower-lr warm-start | `official_009` 配置，lr=1e-5 | 检查 3e-5 是否过拟合，是否需要更保守微调 | todo |
+| 4 | official_017 | warm-start no EMA + averaging | `official_009` 配置但 EMA off，然后 top-3 averaging | 对照 004 的平台收益是否来自 no-EMA checkpoints + averaging | todo |
+| 5 | official_018 | exp044 warm-start | 从旧 `exp_044` 初始化，224 tight crop，lr=3e-5，EMA | 检查旧权重源是否只有 exp054 有效 | todo |
+| 6 | official_019 | resize256 warm-start sanity check | `official_009` 配置不变，只改 `image_size=256` | 验证 256 是否在平台域有额外收益；若本地 holdout 不能接近 009 到 `<=0.003`，不提交平台 | todo |
+| 7 | official_020 | ConvNeXt-Small capacity probe | ConvNeXt-Small, 224 tight crop, CE, wd=0.05, EMA, seed=42；需先注册 `convnext_small` | 评估更高容量同系列模型是否超过 ConvNeXt-Tiny | todo |
+| 8 | official_021 | EfficientNetV2-S capacity probe | EfficientNetV2-S, 224 tight crop, CE, EMA, seed=42；需先注册 `efficientnet_v2_s` | 评估不同架构的更强/互补 backbone 是否值得继续 | todo |
 
 判断标准：
 
-- 若 `official_001` 比 plain checkpoint 高 `>= 0.002` macro F1，优先固定 EMA 作为最终训练流程。
-- 若 `wd=0.05 + EMA` 仍高于 `wd=5e-4 + EMA`，不要把低 weight decay 作为默认配置。
-- 若 top-k averaging 不超过 EMA，不把 averaging 作为默认提交，只保留为备选。
+- 多 seed 平均如果明显低于 `official_009`，只保留 009 单 seed，不做 seed ensemble。
+- 若 `official_016` 平台 test 高于 009，后续 warm-start 默认 lr 降到 1e-5。
+- 若 `official_017` 接近或超过 009，优先做 no-EMA checkpoint averaging，而不是继续强化 EMA。
+- `official_020/021` 若本地 holdout 明显低于 009，不提交平台；若接近，再提交平台 test 判断是否进入主线或 ensemble 备选。
 
-## P2 - 多 seed 稳定性确认
+## P2 - 只在 P0/P1 受限时补充
 
-第一批结果出来后，只对有希望进最终候选的路线做 3 seed。
-
-| 路线 | Seeds | 触发条件 |
-|------|-------|----------|
-| `wd=0.05 + EMA` | 42 / 7 / 2026 | 默认必做，除非 official_001 明显失败 |
-| `wd=5e-4 + EMA` | 42 / 7 / 2026 | 只有当 official_004 距离 official_001 在 `0.002` 以内时做 |
-| `top-k checkpoint averaging` | 42 / 7 / 2026 | 只有当 seed42 上超过 plain 或接近 EMA 时做 |
-
-统计方式：
-
-- 汇总 mean / std macro F1。
-- 同时看 rainy F1、snowy F1、val loss 和 early stop epoch。
-- 若 std `>= 0.003`，不要按单次最高分做最终决策。
-
-## P3 - Ensemble 和多模型集成
-
-> 在 P2 多 seed 稳定性确认后，若多 seed 模型间方差 < 0.003，优先尝试以下集成方式。
-> 本地实验 exp_052（双模型 ensemble）= 0.9159 macro F1 / 0.9056 rainy F1，rainy 互补性强但 macro F1 低于单 EMA。
-
-| 优先级 | 临时 ID | 实验 | 配置 | 目的 |
-|--------|---------|------|------|------|
-| 1 | official_010 | 多 seed EMA 平均 ensemble | official_001 的 3 seed EMA 模型 logits 平均 | 最低成本的集成，不增加推理时间（权重可平均） |
-| 2 | official_011 | 多 seed top-k averaging | 3 seed × top-3 checkpoints 权重平均 | 和 official_004 对照，看 seed 多样性 vs 单 seed top-k |
-| 3 | official_012 | 双模型 logits ensemble | EMA 主模型 + 互补分支，权重搜索 0.5~0.9 | 仅当 rainy 需要额外提升时做，参考 exp_052 |
-
-判断标准：
-- 多 seed EMA 平均的 macro F1 超过单 seed 最高分 ≥ 0.002 才作为主候选。
-- 权重平均不增加推理成本，优先于 logits ensemble。
-- 双模型 ensemble 增加 ~2x 推理成本，只在 rainy F1 增益 ≥ 0.005 时考虑。
-
-## P4 - rainy 互补路线
-
-只有当官方验证集中 `rainy` 仍明显弱于其他类，才优先做下面实验。
-
-| 优先级 | 临时 ID | 实验 | 配置 | 目的 |
-|--------|---------|------|------|------|
-| 1 | official_013 | LabelSmoothing rainy 分支 | ConvNeXt-Tiny 320, LS=0.05, d=0.3, wd=0.05, seed=42 | 复验 `exp_030` 的 rainy 互补性 |
-| 2 | official_014 | EMA 主模型 + LS logits ensemble | `0.8 * EMA + 0.2 * LS` | 提升 rainy，同时控制 macro F1 损失 |
-| 3 | official_015 | EMA 主模型 + LS logits ensemble | `0.7 * EMA + 0.3 * LS` | 检查 rainy 增益上限 |
-| 4 | official_016 | class-balanced sampler | CE, d=0.3, sampler=class_balanced | 仅当 rainy recall 明显偏低时作为后备（⚠️ exp_042: 0.9059 vs baseline 0.9106，大概率无效） |
-
-判断标准：
-
-- ensemble 只有在 macro F1 不下降超过 `0.001`，且 rainy F1 明显提升时才进入最终候选。
-- 如果 CPU 推理预算紧张，双模型 ensemble 只能作为分析参考。
-- 不建议把 LabelSmoothing 直接作为唯一主模型；它更适合作为 rainy 补充分支。
-
-## P5 - 最终候选必须补齐的检查
-
-对进入最终候选的模型补齐下面项目：
-
-- [ ] **Holdout 评估**：在 `data/holdout` 上跑 evaluate，确认 val→holdout 排名一致（差 < 0.002），不一致则重新审视模型选择。
-- [ ] CPU benchmark：至少覆盖 `official_001`、最佳低 wd 备选、最佳 ensemble。
-- [ ] submission check：确认模型加载、预测文件格式、类别映射和 CPU-only 环境都能跑。
-- [ ] error samples：导出验证集错分样本，重点看 cloudy/rainy、sunny/cloudy 混淆。
-- [ ] confusion matrix：保存每个最终候选的混淆矩阵。
-- [ ] model size：记录单模型和 ensemble 的权重大小。
-- [ ] 更新 `experiments/leaderboard.md`、`experiments/experiment_queue.md`、`experiments/finding.md`。
-
-最终推荐优先级：
-
-1. 最高优先：`ConvNeXt-Tiny 320 + CE + dropout=0.3 + wd=0.05 + EMA=0.999 + no rotation + light CJ`
-2. 备选：`ConvNeXt-Tiny 320 + CE + dropout=0.3 + wd=5e-4 + EMA/SWA`
-3. rainy 优先备选：`EMA 主模型 + LabelSmoothing 分支 logits ensemble`
-
-## 384 分辨率对照
-
-> 本地三轮实验一致显示 384 负于 320：
-> - exp_056 FixRes 320→384: 0.9170 vs exp_054 320: 0.9204
-> - exp_060 全训练 384: 0.9164 vs exp_054 320: 0.9204
-> - 四个类别全线下滑，非波动。
->
-> 新数据集上不再对 384 投入训练资源，只做一次 inference-only 对照。
-
-- [ ] 新数据集发布后，用 `exp_054` (320) 和 `exp_060` (384) 的 checkpoint 各跑一次 evaluate，确认分辨率排序是否迁移。
-- [ ] 若 384 在新测试集上翻转（概率低），再重新评估是否做 384 全训练；否则 384 方向画句号。
+| 临时 ID | 实验 | 触发条件 |
+|---------|------|----------|
+| official_022 | 009/014/015 seed logits ensemble | 只有当 014/015 单模型平台 test 接近 009 时做 |
+| official_023 | warm-start LS=0.05 分支 | 只有当平台错误分析显示 rainy 明显偏弱时做 |
+| official_024 | 009 + LS 分支 logits ensemble | 只有 official_023 的 rainy 互补性明确时做 |
 
 ## 暂时不要做
 
-- [ ] 不先做大范围 dropout sweep。
-- [ ] 不先做更多 backbone。
-- [ ] 不先上强 RandAugment、MixUp、CutMix 或强 rotation。
-- [ ] 不盲目提高输入尺寸到 384。
-- [ ] 不继续当前 center-crop TTA 路线。
-- [ ] 不在没有最终 holdout 的情况下反复调 ensemble 权重。
-- [ ] 不使用 `weights/convnext_tiny_best.pth` 作为稳定实验产物；比较时使用 `outputs/<experiment_id>/best_model.pth` 或对应 averaged/EMA artifact。
-- [ ] 不把 loss 层面的不平衡策略（class_weights, FocalLoss, label_smoothing）作为第一批实验。当前数据集上它们在 convnext_tiny 上均不优于纯 CE（exp_011/030/042），但新数据集可能不同。若新数据 rainy/snowy 显著弱于当前数据，再作为第二批补做。
+- 不继续 320 大矩阵。
+- 不做 384/512。
+- 不回到标准 rotation + stronger color jitter。
+- 不继续低 weight decay 主线。
+- 不优先 weighted CE / focal / sampler。
+- 不做 cutout / 当前 center-crop TTA。
+- 不在 `0.8/0.2`、`0.7/0.3` 之外继续大范围调 logits ensemble 权重。
+- 不使用 `weights/convnext_tiny_best.pth` 做稳定比较；比较时使用 `outputs/<experiment_id>/best_model.pth` 或明确的 averaged artifact。
+
+## 下一步执行顺序
+
+1. 跑 `official_010`。
+2. 跑 `official_011`。
+3. 跑 `official_012` 和 `official_013`，只提交两种固定权重。
+4. 若 `official_010/012/013` 没超过 `official_009`，再启动 `official_014/015/016`，并补 `official_019/020/021`。
+5. 每批结束后同步 `experiments/official_leaderboard.md` 和 `experiments/officialTestScore.md`，不要只更新本文件。

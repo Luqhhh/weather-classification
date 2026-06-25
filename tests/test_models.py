@@ -22,6 +22,8 @@ class TestModelFactory:
         assert "resnet18" in models
         assert "mobilenetv3_small" in models
         assert "efficientnet_b0" in models
+        assert "convnext_small" in models
+        assert "efficientnet_v2_s" in models
 
     def test_create_resnet18(self):
         model = create_model("resnet18", num_classes=4, pretrained=False)
@@ -42,6 +44,20 @@ class TestModelFactory:
         assert info["name"] == "resnet18"
         assert "in_features" in info
         assert "description" in info
+
+    @pytest.mark.parametrize(
+        ("model_name", "expected_in_features"),
+        [
+            ("convnext_small", 768),
+            ("efficientnet_v2_s", 1280),
+        ],
+    )
+    def test_create_capacity_probe_models(self, model_name, expected_in_features):
+        model = create_model(model_name, num_classes=4, pretrained=False)
+        assert isinstance(model, WeatherClassifier)
+        assert model.backbone_name == model_name
+        assert model.num_classes == 4
+        assert get_model_info(model_name)["in_features"] == expected_in_features
 
 
 class TestWeatherClassifier:

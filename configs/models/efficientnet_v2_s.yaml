@@ -1,0 +1,43 @@
+# EfficientNetV2-S - official data capacity probe
+#
+# 224 tight-crop backbone probe for official_021. Kept separate from the
+# ConvNeXt line to test architecture complementarity.
+
+model:
+  name: "efficientnet_v2_s"
+  pretrained: true
+  dropout: 0.3
+
+data:
+  image_size: 224
+  augmentation:
+    random_resized_crop:
+      scale: [0.85, 1.0]
+      ratio: [0.9, 1.1]
+    random_horizontal_flip:
+      prob: 0.5
+    color_jitter:
+      brightness: 0.08
+      contrast: 0.08
+      saturation: 0.08
+      hue: 0.03
+    random_rotation:
+      degrees: 0
+    rand_augment: null
+    mixup_alpha: null
+    cutmix_alpha: null
+
+training:
+  batch_size: 32
+  epochs: 50
+  optimizer:
+    name: "adamw"
+    lr: 0.0001
+    weight_decay: 0.05
+  scheduler:
+    name: "cosine"
+    warmup_epochs: 3
+    min_lr: 0.000001
+  ema:
+    enabled: true
+    decay: 0.999

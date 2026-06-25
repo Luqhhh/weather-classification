@@ -62,6 +62,16 @@ MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "in_features": 768,
         "description": "ConvNeXt-Tiny — Modern CNN, check CPU speed",
     },
+    "convnext_small": {
+        "builder": models.convnext_small,
+        "in_features": 768,
+        "description": "ConvNeXt-Small — Higher-capacity ConvNeXt for accuracy probes",
+    },
+    "efficientnet_v2_s": {
+        "builder": models.efficientnet_v2_s,
+        "in_features": 1280,
+        "description": "EfficientNetV2-S — Strong 224px backbone for accuracy probes",
+    },
     "shufflenet_v2_x1_0": {
         "builder": models.shufflenet_v2_x1_0,
         "in_features": 1024,
