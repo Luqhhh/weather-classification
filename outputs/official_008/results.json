@@ -1,0 +1,164 @@
+{
+  "experiment_id": "official_008",
+  "status": "registered",
+  "created_at": "2026-06-25T05:54:35.589488+00:00",
+  "branch": "main",
+  "commit_hash": "ac66f860",
+  "model": "convnext_tiny",
+  "image_size": "320",
+  "loss": "cross_entropy",
+  "augmentation": "default",
+  "dropout": "0.3",
+  "batch_size": "32",
+  "val_macro_f1": "",
+  "cloudy_f1": "",
+  "rainy_f1": "",
+  "snowy_f1": "",
+  "sunny_f1": "",
+  "cpu_time_per_image": "",
+  "model_size_mb": "",
+  "submit_check_passed": "",
+  "notes": "official data: ConvNeXt 320 CE EMA tight crop seed=42",
+  "git": {
+    "branch": "main",
+    "commit_hash": "ac66f860",
+    "commit_message": "Merge branch 'feature/official-experiments'",
+    "dirty": true,
+    "dirty_files": [
+      "M TODO.md",
+      " M \"\\345\\244\\251\\346\\260\\224\\350\\257\\206\\345\\210\\253/main.py\"",
+      "?? outputs/official_007/",
+      "?? outputs/official_008/",
+      "?? \"\\345\\244\\251\\346\\260\\224\\350\\257\\206\\345\\210\\253/results/\""
+    ]
+  },
+  "config": {
+    "data": {
+      "train_dir": "data/train",
+      "val_dir": "data/val",
+      "holdout_dir": "data/holdout",
+      "test_dir": "data/test",
+      "val_split": 0.15,
+      "holdout_split": 0.15,
+      "num_workers": 0,
+      "multiprocessing_context": null,
+      "pin_memory": false,
+      "image_size": 320,
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ],
+      "augmentation": {
+        "random_resized_crop": {
+          "scale": [
+            0.85,
+            1.0
+          ],
+          "ratio": [
+            0.9,
+            1.1
+          ]
+        },
+        "random_horizontal_flip": {
+          "prob": 0.5
+        },
+        "color_jitter": {
+          "brightness": 0.08,
+          "contrast": 0.08,
+          "saturation": 0.08,
+          "hue": 0.03
+        },
+        "random_rotation": {
+          "degrees": 0
+        },
+        "rand_augment": null,
+        "mixup_alpha": null,
+        "cutmix_alpha": null
+      }
+    },
+    "model": {
+      "name": "convnext_tiny",
+      "pretrained": true,
+      "num_classes": 4,
+      "dropout": 0.3,
+      "freeze_backbone": false
+    },
+    "training": {
+      "batch_size": 32,
+      "epochs": 50,
+      "optimizer": {
+        "name": "adamw",
+        "lr": 0.0001,
+        "weight_decay": 0.05
+      },
+      "scheduler": {
+        "name": "cosine",
+        "warmup_epochs": 3,
+        "min_lr": 1e-06,
+        "step_size": 15,
+        "step_gamma": 0.1
+      },
+      "loss": {
+        "name": "cross_entropy",
+        "label_smoothing": 0.0
+      },
+      "early_stopping": {
+        "patience": 10,
+        "min_delta": 0.001
+      },
+      "checkpoint": {
+        "save_top_k": 3,
+        "monitor": "val_macro_f1",
+        "mode": "max"
+      },
+      "sampler": {
+        "name": "none"
+      },
+      "ema": {
+        "enabled": true,
+        "decay": 0.999
+      }
+    },
+    "inference": {
+      "device": "cpu",
+      "batch_size": 32,
+      "num_workers": 2,
+      "use_onnx": false,
+      "fp16": false
+    },
+    "logging": {
+      "log_dir": "outputs",
+      "experiment_name": "official_008",
+      "tensorboard": true,
+      "wandb": false,
+      "log_interval": 10
+    },
+    "seed": 42
+  },
+  "training": {
+    "best_epoch": 21,
+    "total_epochs": 31,
+    "early_stopped": true,
+    "train_samples": 3383,
+    "val_samples": 723,
+    "training_time_min": 26.0,
+    "best_val_macro_f1": 0.9375,
+    "best_val_accuracy": 0.9447
+  },
+  "evaluation": {},
+  "benchmark": {},
+  "submit_check": {},
+  "artifacts": {
+    "best_model.pth": "best_model.pth",
+    "training_history.csv": "training_history.csv",
+    "training_log.jsonl": "training_log.jsonl",
+    "config.yaml": "config.yaml",
+    "confusion_matrix_final.png": "confusion_matrix_final.png"
+  }
+}

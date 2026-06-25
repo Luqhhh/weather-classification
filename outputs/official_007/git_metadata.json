@@ -1,0 +1,12 @@
+{
+  "branch": "main",
+  "commit_hash": "63f91399",
+  "commit_message": "revert: remove FP16 conversion — FP32 uploads work without compression",
+  "dirty": true,
+  "dirty_files": [
+    "M TODO.md",
+    " M \"\\345\\244\\251\\346\\260\\224\\350\\257\\206\\345\\210\\253/main.py\"",
+    "?? outputs/official_007/",
+    "?? \"\\345\\244\\251\\346\\260\\224\\350\\257\\206\\345\\210\\253/results/\""
+  ]
+}

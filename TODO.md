@@ -35,6 +35,31 @@
 
 > **为什么加 official_003**：当前数据上 exp_044（EMA + 标准增强）= 0.9182 vs exp_054（EMA + 保守增强）= 0.9204，差了 0.002。需要在官方数据上确认保守增强的收益是否可复现，还是 EMA 本身贡献了大部分。
 
+## P1.5 - 官方 224 数据补充实验（当前新增）
+
+> 触发原因：官方目前只发布训练集，且当前 `data/train` / `data/val` / `data/holdout` 是从官方训练集切分出来的；图像尺寸全部为 224×224。旧 `exp_0xx` 权重是在旧数据集训练得到，只能作为迁移基线。先验证新数据上原生 224、收紧 crop、旧权重低学习率迁移是否更优。
+
+| 优先级 | 临时 ID | 实验 | 配置 | 目的 | 状态 |
+|--------|---------|------|------|------|------|
+| 1 | official_007 | 224 + tight crop 主线 | ConvNeXt-Tiny, CE, dropout=0.3, wd=0.05, EMA=0.999, image_size=224, RRC scale=[0.85,1.0], no rotation, light CJ, seed=42 | 验证官方 224 原图下是否应放弃 320 上采样 | done: val macro F1 0.9380 |
+| 2 | official_008 | 320 + tight crop 对照 | ConvNeXt-Tiny, CE, dropout=0.3, wd=0.05, EMA=0.999, image_size=320, RRC scale=[0.85,1.0], no rotation, light CJ, seed=42 | 分离“尺寸收益”和“crop 收紧收益” | done: val macro F1 0.9375 |
+| 3 | official_009 | 旧 exp_054 权重迁移微调 | 从 `outputs/old/exp_054/best_model.pth` 初始化，ConvNeXt-Tiny, image_size=224, tight crop, EMA=0.999, lr=3e-5, wd=0.05, seed=42 | 验证旧数据特征是否能帮助新数据收敛和泛化 | done: val macro F1 0.9509 |
+
+判断标准：
+
+- 先看 val macro F1、rainy F1、snowy F1、confusion matrix；只把前 2 名拿到 holdout 确认。
+- 若 `official_007` 与 320 路线差距在 `0.002-0.004` 内，优先考虑 224，因为它贴合原图且 CPU 成本更低。
+- 若 `official_008` 明显超过 `official_001/007`，说明 tight crop 比尺寸本身更关键，后续固定收紧 crop。
+- 若 `official_009` 明显超过从 ImageNet 初始化的新训模型，后续把旧数据 checkpoint 作为 warm-start 路线；否则最终仍以新数据从 ImageNet 初始化为主。
+- 暂不加入 weighted CE / focal / sampler。旧数据中 weighted CE 效果不好；只有当新数据 val 上 rainy/snowy 明显弱于其他类时，再补不均衡实验。
+
+当前结果：
+
+- `official_007`: 0.9380，224 + tight crop 新训；best per-class F1 = cloudy 0.9399 / rainy 0.9231 / snowy 0.9402 / sunny 0.9489。
+- `official_008`: 0.9375，320 + tight crop 新训；未超过 224，且训练/推理成本更高；best per-class F1 = cloudy 0.9425 / rainy 0.9008 / snowy 0.9508 / sunny 0.9559。
+- `official_009`: 0.9509，旧 `exp_054` warm-start + 224 tight crop，目前 val 第一；best per-class F1 = cloudy 0.9494 / rainy 0.9474 / snowy 0.9474 / sunny 0.9594。
+- 三条实验里 rainy/snowy 没有表现为明显弱类；暂不加 weighted CE / focal / sampler，优先对 `official_009` 和 `official_007` 做 holdout 复核。
+
 建议命令模板：
 
 ```bash

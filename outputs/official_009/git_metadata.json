@@ -1,0 +1,14 @@
+{
+  "branch": "main",
+  "commit_hash": "ac66f860",
+  "commit_message": "Merge branch 'feature/official-experiments'",
+  "dirty": true,
+  "dirty_files": [
+    "M TODO.md",
+    " M \"\\345\\244\\251\\346\\260\\224\\350\\257\\206\\345\\210\\253/main.py\"",
+    "?? outputs/official_007/",
+    "?? outputs/official_008/",
+    "?? outputs/official_009/",
+    "?? \"\\345\\244\\251\\346\\260\\224\\350\\257\\206\\345\\210\\253/results/\""
+  ]
+}
