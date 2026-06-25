@@ -1,13 +1,9 @@
 {
-  "branch": "main",
-  "commit_hash": "a9f43af9",
-  "commit_message": "chore: add gitignore rules for old data, old outputs, and submission artifacts",
+  "branch": "feature/official-experiments",
+  "commit_hash": "abf6a6ce",
+  "commit_message": "feat: add official competition dataset with 70/15/15 split",
   "dirty": true,
   "dirty_files": [
-    "?? data/holdout/",
-    "?? data/train.zip",
-    "?? data/train/",
-    "?? data/val/",
-    "?? outputs/official_001/"
+    "?? memory/"
   ]
 }

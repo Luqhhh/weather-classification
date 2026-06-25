@@ -1,0 +1,15 @@
+{
+  "branch": "feature/official-experiments",
+  "commit_hash": "abf6a6ce",
+  "commit_message": "feat: add official competition dataset with 70/15/15 split",
+  "dirty": true,
+  "dirty_files": [
+    "M outputs/official_001/git_metadata.json",
+    "?? memory/",
+    "?? outputs/official_001/confusion_matrix_final.png",
+    "?? outputs/official_001/results.json",
+    "?? outputs/official_001/training_history.csv",
+    "?? outputs/official_001/training_log.jsonl",
+    "?? outputs/official_002/"
+  ]
+}
