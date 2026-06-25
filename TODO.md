@@ -59,10 +59,12 @@
 | 2 | official_015 | warm-start seed 2026 | `official_009` 配置，seed=2026 | 与 014 一起估计 seed 方差 | todo |
 | 3 | official_016 | lower-lr warm-start | `official_009` 配置，lr=1e-5 | 检查 3e-5 是否过拟合，是否需要更保守微调 | todo |
 | 4 | official_017 | warm-start no EMA + averaging | `official_009` 配置但 EMA off，然后 top-3 averaging | 对照 004 的平台收益是否来自 no-EMA checkpoints + averaging | todo |
-| 5 | official_018 | exp044 warm-start | 从旧 `exp_044` 初始化，224 tight crop，lr=3e-5，EMA | 检查旧权重源是否只有 exp054 有效 | todo |
-| 6 | official_019 | resize256 warm-start sanity check | `official_009` 配置不变，只改 `image_size=256` | 验证 256 是否在平台域有额外收益；若本地 holdout 不能接近 009 到 `<=0.003`，不提交平台 | todo |
-| 7 | official_020 | ConvNeXt-Small capacity probe | ConvNeXt-Small, 224 tight crop, CE, wd=0.05, EMA, seed=42；需先注册 `convnext_small` | 评估更高容量同系列模型是否超过 ConvNeXt-Tiny | todo |
-| 8 | official_021 | EfficientNetV2-S capacity probe | EfficientNetV2-S, 224 tight crop, CE, EMA, seed=42；需先注册 `efficientnet_v2_s` | 评估不同架构的更强/互补 backbone 是否值得继续 | todo |
+| 5 | official_018 | exp044 warm-start | 从旧 `exp_044` 初始化，224 tight crop，lr=3e-5，EMA | 检查旧权重源是否只有 exp054 有效 | done: val 0.9467 / holdout 0.9423 |
+| 6 | official_019 | resize256 warm-start sanity check | `official_009` 配置不变，只改 `image_size=256` | 验证 256 是否在平台域有额外收益 | done: val 0.9543 / holdout 0.9540，当前本地最高 |
+| 7 | official_020 | ConvNeXt-Small capacity probe | ConvNeXt-Small, 224 tight crop, CE, wd=0.05, EMA, seed=42 | 评估更高容量同系列模型是否超过 ConvNeXt-Tiny | done: val 0.9457 / holdout 0.9470，49M 参数未超 Tiny，backbone 更大≠更好 |
+| 8 | official_021 | EfficientNetV2-S capacity probe | EfficientNetV2-S, 224 tight crop, CE, EMA, seed=42 | 评估不同架构 backbone 互补性 | **aborted**: epoch 19 best=0.923，明显低于 ConvNeXt 系列，不继续 |
+| 9 | official_022 | progressive resize 256→320 | 019 backbone → 320，lr=1e-5，EMA | 验证渐进式分辨率扩张是否保留 256 特征并捕获 320 细节 | done: val 0.9551 / holdout **0.9572**，新纪录 |
+| 10 | official_023 | size 288 probe | exp054 warm-start, `image_size=288`，其余同 019 | 验证 size 甜点是否在 256↔320 之间 | done: val 0.9568 / holdout 0.9461，过拟合，288 不是甜点 |
 
 判断标准：
 
@@ -75,9 +77,9 @@
 
 | 临时 ID | 实验 | 触发条件 |
 |---------|------|----------|
-| official_022 | 009/014/015 seed logits ensemble | 只有当 014/015 单模型平台 test 接近 009 时做 |
-| official_023 | warm-start LS=0.05 分支 | 只有当平台错误分析显示 rainy 明显偏弱时做 |
-| official_024 | 009 + LS 分支 logits ensemble | 只有 official_023 的 rainy 互补性明确时做 |
+| official_024 | 009/014/015 seed logits ensemble | 只有当 014/015 单模型平台 test 接近 009 时做 |
+| official_025 | warm-start LS=0.05 分支 | 只有当平台错误分析显示 rainy 明显偏弱时做 |
+| official_026 | 009 + LS 分支 logits ensemble | 只有 official_025 的 rainy 互补性明确时做 |
 
 ## 暂时不要做
 
