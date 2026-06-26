@@ -56,16 +56,25 @@ _ensemble_mode = False
 _models = []
 _weights = []
 _image_sizes = []
+_temperatures = []
+_tta_views = ['identity']
+_class_bias = None
 
 if isinstance(state, dict) and state.get('type') == 'logits_ensemble':
     # Ensemble 模式：加载多个子模型
     _ensemble_mode = True
+    if 'class_bias' in state:
+        _class_bias = torch.as_tensor(
+            state['class_bias'], dtype=torch.float32, device=device
+        ).view(1, -1)
+    _tta_views = state.get('tta', ['identity'])
     for m in state['members']:
         model = _build_model()
         model.load_state_dict(m['state_dict'])
         _models.append(model)
         _weights.append(m['weight'])
         _image_sizes.append(m.get('image_size', IM_SIZE))
+        _temperatures.append(float(m.get('temperature', 1.0)))
 else:
     # 单模型模式
     if isinstance(state, dict) and "model_state_dict" in state:
@@ -75,6 +84,15 @@ else:
     _models = [model]
     _weights = [1.0]
     _image_sizes = [IM_SIZE]
+    _temperatures = [1.0]
+
+
+def _preprocess_view(X, im_size, view):
+    if view == 'identity':
+        return _preprocess(X, im_size)
+    if view == 'hflip':
+        return _preprocess(X[:, ::-1, :], im_size)
+    raise ValueError(f'Unsupported TTA view: {view}')
 
 
 def predict(X):
@@ -87,14 +105,27 @@ def predict(X):
     """
     logits_sum = None
 
-    for model, weight, im_size in zip(_models, _weights, _image_sizes):
-        x = _preprocess(X, im_size)
-        with torch.no_grad():
-            logits = model(x)
+    for model, weight, im_size, temperature in zip(
+        _models, _weights, _image_sizes, _temperatures
+    ):
+        member_logits = None
+        for view in _tta_views:
+            x = _preprocess_view(X, im_size, view)
+            with torch.no_grad():
+                logits = model(x)
+            if member_logits is None:
+                member_logits = logits
+            else:
+                member_logits += logits
+        logits = member_logits / len(_tta_views)
+        logits = logits / temperature
         if logits_sum is None:
             logits_sum = logits * weight
         else:
             logits_sum += logits * weight
+
+    if _class_bias is not None:
+        logits_sum = logits_sum + _class_bias
 
     pred_idx = torch.argmax(logits_sum, dim=1).item()
     return LABELS[pred_idx]

@@ -1,0 +1,26 @@
+{
+  "type": "logits_ensemble",
+  "source_experiment": "official_026",
+  "labels": [
+    "cloudy",
+    "rainy",
+    "snowy",
+    "sunny"
+  ],
+  "holdout_macro_f1": 0.9423,
+  "note": "official_026 = 0.8*official_018 + 0.2*official_004 logits ensemble.",
+  "members": [
+    {
+      "experiment_id": "official_018",
+      "source": "outputs/official_018/best_model.pth",
+      "weight": 0.8,
+      "image_size": 224
+    },
+    {
+      "experiment_id": "official_004",
+      "source": "outputs/official_004/best_model.pth",
+      "weight": 0.2,
+      "image_size": 320
+    }
+  ]
+}

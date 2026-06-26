@@ -1,0 +1,81 @@
+{
+  "mode": "class_bias",
+  "weights": [
+    0.7,
+    0.3
+  ],
+  "class_bias": [
+    -0.49999999999999956,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "search_best_macro_f1": 0.9541,
+  "bias_candidates": [
+    -1.0,
+    1.0000000000000018,
+    41
+  ],
+  "elapsed_sec": 7.157,
+  "metrics": {
+    "macro_f1": 0.9541,
+    "accuracy": 0.9502,
+    "per_class": {
+      "cloudy": {
+        "precision": 0.9605,
+        "recall": 0.9359,
+        "f1": 0.9481,
+        "support": 312
+      },
+      "rainy": {
+        "precision": 0.9552,
+        "recall": 0.9697,
+        "f1": 0.9624,
+        "support": 66
+      },
+      "snowy": {
+        "precision": 0.9661,
+        "recall": 0.95,
+        "f1": 0.958,
+        "support": 60
+      },
+      "sunny": {
+        "precision": 0.9352,
+        "recall": 0.9614,
+        "f1": 0.9481,
+        "support": 285
+      }
+    },
+    "confusion_matrix": [
+      [
+        292,
+        3,
+        0,
+        17
+      ],
+      [
+        2,
+        64,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        57,
+        2
+      ],
+      [
+        9,
+        0,
+        2,
+        274
+      ]
+    ],
+    "weak_classes": [
+      "cloudy",
+      "sunny"
+    ],
+    "avg_per_class_f1": 0.9542
+  }
+}

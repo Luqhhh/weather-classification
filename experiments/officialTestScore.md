@@ -15,6 +15,12 @@ official013 F1 macro 得分为 0.945637871473125
 official014
 official018 F1 macro 得分为 0.9445588225726549
 official019 F1 macro 得分为 0.9359164409605192
-official022
+official022 F1 macro 得分为 0.9252962034040216
 official023
-
+official024
+official025
+official026
+official027
+official029
+official030
+official031

@@ -1,0 +1,24 @@
+{
+  "type": "logits_ensemble",
+  "source_experiment": "official_031",
+  "labels": [
+    "cloudy",
+    "rainy",
+    "snowy",
+    "sunny"
+  ],
+  "tta": [
+    "identity",
+    "hflip"
+  ],
+  "holdout_macro_f1": 0.9431,
+  "note": "official_031 = official_018 original + horizontal-flip logits TTA.",
+  "members": [
+    {
+      "experiment_id": "official_018",
+      "source": "outputs/official_018/best_model.pth",
+      "weight": 1.0,
+      "image_size": 224
+    }
+  ]
+}

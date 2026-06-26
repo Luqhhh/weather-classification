@@ -1,0 +1,32 @@
+{
+  "type": "logits_ensemble",
+  "source_experiment": "official_027",
+  "labels": [
+    "cloudy",
+    "rainy",
+    "snowy",
+    "sunny"
+  ],
+  "holdout_macro_f1": 0.9418,
+  "note": "official_027 = 0.5*official_018 + 0.35*official_009 + 0.15*official_004 logits ensemble.",
+  "members": [
+    {
+      "experiment_id": "official_018",
+      "source": "outputs/official_018/best_model.pth",
+      "weight": 0.5,
+      "image_size": 224
+    },
+    {
+      "experiment_id": "official_009",
+      "source": "outputs/official_009/best_model.pth",
+      "weight": 0.35,
+      "image_size": 224
+    },
+    {
+      "experiment_id": "official_004",
+      "source": "outputs/official_004/best_model.pth",
+      "weight": 0.15,
+      "image_size": 320
+    }
+  ]
+}

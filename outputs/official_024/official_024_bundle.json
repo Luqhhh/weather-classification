@@ -1,0 +1,21 @@
+{
+  "type": "logits_ensemble",
+  "source_experiment": "official_024",
+  "base_experiment": "official_018",
+  "labels": [
+    "cloudy",
+    "rainy",
+    "snowy",
+    "sunny"
+  ],
+  "holdout_macro_f1": 0.9423,
+  "note": "official_024 = official_018 top-3 checkpoint averaging; wrapped as a one-member bundle to preserve image_size=224.",
+  "members": [
+    {
+      "experiment_id": "official_024",
+      "source": "outputs/official_024/best_model.pth",
+      "weight": 1.0,
+      "image_size": 224
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "type": "logits_average",
+  "members": [
+    {
+      "weights": "outputs/official_018/best_model.pth",
+      "config": "outputs/official_018/config.yaml",
+      "weight": 0.8
+    },
+    {
+      "weights": "outputs/official_004/best_model.pth",
+      "config": "outputs/official_002/config.yaml",
+      "weight": 0.2
+    }
+  ]
+}

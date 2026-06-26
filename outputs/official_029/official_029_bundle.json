@@ -1,0 +1,35 @@
+{
+  "type": "logits_ensemble",
+  "source_experiment": "official_029",
+  "labels": [
+    "cloudy",
+    "rainy",
+    "snowy",
+    "sunny"
+  ],
+  "holdout_macro_f1": 0.9418,
+  "note": "official_029 = temperature-calibrated official_027-style logits ensemble.",
+  "members": [
+    {
+      "experiment_id": "official_018",
+      "source": "outputs/official_018/best_model.pth",
+      "weight": 0.5,
+      "image_size": 224,
+      "temperature": 3.0
+    },
+    {
+      "experiment_id": "official_009",
+      "source": "outputs/official_009/best_model.pth",
+      "weight": 0.35,
+      "image_size": 224,
+      "temperature": 3.0
+    },
+    {
+      "experiment_id": "official_004",
+      "source": "outputs/official_004/best_model.pth",
+      "weight": 0.15,
+      "image_size": 320,
+      "temperature": 2.4
+    }
+  ]
+}
