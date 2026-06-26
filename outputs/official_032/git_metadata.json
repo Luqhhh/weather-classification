@@ -1,0 +1,16 @@
+{
+  "branch": "main",
+  "commit_hash": "a2c37b12",
+  "commit_message": "chore: add official_028 experiment results",
+  "dirty": true,
+  "dirty_files": [
+    "?? _tmp_official_028.yaml",
+    "?? _tmp_official_032.yaml",
+    "?? data/train_val/",
+    "?? official_best_models/",
+    "?? outputs/official_028/best_model_avg5.json",
+    "?? outputs/official_028/eval_holdout/",
+    "?? outputs/official_028/eval_holdout_best/",
+    "?? outputs/official_032/"
+  ]
+}

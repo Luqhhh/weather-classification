@@ -1,7 +1,7 @@
 {
-  "experiment_id": "official_033",
+  "experiment_id": "official_036",
   "status": "partial",
-  "created_at": "2026-06-26T08:46:01.285587+00:00",
+  "created_at": "2026-06-26T08:48:08.483379+00:00",
   "branch": "main",
   "commit_hash": "04585c5a",
   "model": "logits_ensemble",
@@ -10,15 +10,15 @@
   "augmentation": "default",
   "dropout": "0.3",
   "batch_size": "32",
-  "val_macro_f1": "0.9224",
-  "cloudy_f1": "0.9183",
-  "rainy_f1": "0.9091",
+  "val_macro_f1": "0.9303",
+  "cloudy_f1": "0.9279",
+  "rainy_f1": "0.9242",
   "snowy_f1": "0.9344",
-  "sunny_f1": "0.9276",
+  "sunny_f1": "0.9347",
   "cpu_time_per_image": "",
   "model_size_mb": "",
   "submit_check_passed": "",
-  "notes": "official_033 holdout: 3-fold ConvNeXt-Tiny 224 warm-start logits ensemble",
+  "notes": "official_036 holdout: 0.7*official_033 3-fold + 0.3*official_004 logits ensemble",
   "git": {
     "branch": "main",
     "commit_hash": "04585c5a",
@@ -27,7 +27,9 @@
     "dirty_files": [
       "?? outputs/official_028/eval_holdout/",
       "?? outputs/official_028/official_028_bundle.json",
-      "?? outputs/official_033/"
+      "?? outputs/official_033/",
+      "?? outputs/official_035/",
+      "?? outputs/official_036/"
     ]
   },
   "config": {
@@ -144,36 +146,41 @@
         {
           "weights": "outputs/official_033/folds/official_033_fold1_best_model.pth",
           "config": "outputs/official_028/config.yaml",
-          "weight": 0.3333333333
+          "weight": 0.2333333333
         },
         {
           "weights": "outputs/official_033/folds/official_033_fold2_best_model.pth",
           "config": "outputs/official_028/config.yaml",
-          "weight": 0.3333333333
+          "weight": 0.2333333333
         },
         {
           "weights": "outputs/official_033/folds/official_033_fold3_best_model.pth",
           "config": "outputs/official_028/config.yaml",
-          "weight": 0.3333333333
+          "weight": 0.2333333333
+        },
+        {
+          "weights": "outputs/official_004/best_model.pth",
+          "config": "outputs/official_002/config.yaml",
+          "weight": 0.3
         }
       ]
     }
   },
   "training": {},
   "evaluation": {
-    "macro_f1": 0.9224,
-    "accuracy": 0.9225,
+    "macro_f1": 0.9303,
+    "accuracy": 0.9308,
     "per_class": {
       "cloudy": {
-        "precision": 0.9367,
-        "recall": 0.9006,
-        "f1": 0.9183,
+        "precision": 0.9497,
+        "recall": 0.9071,
+        "f1": 0.9279,
         "support": 312
       },
       "rainy": {
-        "precision": 0.9091,
-        "recall": 0.9091,
-        "f1": 0.9091,
+        "precision": 0.9242,
+        "recall": 0.9242,
+        "f1": 0.9242,
         "support": 66
       },
       "snowy": {
@@ -183,43 +190,43 @@
         "support": 60
       },
       "sunny": {
-        "precision": 0.9119,
-        "recall": 0.9439,
-        "f1": 0.9276,
+        "precision": 0.9158,
+        "recall": 0.9544,
+        "f1": 0.9347,
         "support": 285
       }
     },
     "confusion_matrix": [
       [
-        281,
-        6,
+        283,
+        5,
         1,
-        24
+        23
       ],
       [
         5,
-        60,
+        61,
         0,
-        1
+        0
       ],
       [
-        2,
+        1,
         0,
         57,
-        1
+        2
       ],
       [
-        12,
+        9,
         0,
         4,
-        269
+        272
       ]
     ],
     "weak_classes": [
       "cloudy",
       "rainy"
     ],
-    "avg_per_class_f1": 0.9224
+    "avg_per_class_f1": 0.9303
   },
   "benchmark": {},
   "submit_check": {},

@@ -9,7 +9,7 @@ from torchvision import models
 MODEL_PATH = './results/convnext_tiny_320_best.pth'
 
 # 配置（与训练时保持一致）
-IM_SIZE = 320
+IM_SIZE = 224
 MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 LABELS = ['cloudy', 'rainy', 'snowy', 'sunny']

@@ -1,28 +1,26 @@
 {
   "type": "logits_ensemble",
   "source_experiment": "official_035",
-  "labels": ["cloudy", "rainy", "snowy", "sunny"],
-  "holdout_macro_f1": 0.9283,
-  "temperature": 2.0,
-  "note": "official_035 = 3-fold warm-start logits ensemble with temperature T=2.0 calibration. Same members as official_033 but with softmax temperature scaling.",
+  "labels": [
+    "cloudy",
+    "rainy",
+    "snowy",
+    "sunny"
+  ],
+  "holdout_macro_f1": 0.9439,
+  "note": "official_035 = 0.7*official_028 + 0.3*official_004 logits ensemble.",
   "members": [
     {
-      "experiment_id": "official_033_fold1",
-      "source": "outputs/official_033_fold1/official_033_fold1_best_model.pth",
-      "weight": 0.333,
+      "experiment_id": "official_028",
+      "source": "outputs/official_028/best_model.pth",
+      "weight": 0.7,
       "image_size": 224
     },
     {
-      "experiment_id": "official_033_fold2",
-      "source": "outputs/official_033_fold2/official_033_fold2_best_model.pth",
-      "weight": 0.333,
-      "image_size": 224
-    },
-    {
-      "experiment_id": "official_033_fold3",
-      "source": "outputs/official_033_fold3/official_033_fold3_best_model.pth",
-      "weight": 0.333,
-      "image_size": 224
+      "experiment_id": "official_004",
+      "source": "outputs/official_004/best_model.pth",
+      "weight": 0.3,
+      "image_size": 320
     }
   ]
 }
