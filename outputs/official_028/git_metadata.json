@@ -1,0 +1,10 @@
+{
+  "branch": "main",
+  "commit_hash": "191f1701",
+  "commit_message": "docs: update official leaderboard",
+  "dirty": true,
+  "dirty_files": [
+    "?? _tmp_official_028.yaml",
+    "?? outputs/official_028/"
+  ]
+}
