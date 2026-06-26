@@ -1,0 +1,168 @@
+{
+  "experiment_id": "official_032",
+  "status": "registered",
+  "created_at": "2026-06-26T08:24:20.385879+00:00",
+  "branch": "main",
+  "commit_hash": "a2c37b12",
+  "model": "convnext_tiny",
+  "image_size": "224",
+  "loss": "cross_entropy",
+  "augmentation": "default",
+  "dropout": "0.3",
+  "batch_size": "32",
+  "val_macro_f1": "",
+  "cloudy_f1": "",
+  "rainy_f1": "",
+  "snowy_f1": "",
+  "sunny_f1": "",
+  "cpu_time_per_image": "",
+  "model_size_mb": "",
+  "submit_check_passed": "",
+  "notes": "",
+  "git": {
+    "branch": "main",
+    "commit_hash": "a2c37b12",
+    "commit_message": "chore: add official_028 experiment results",
+    "dirty": true,
+    "dirty_files": [
+      "?? _tmp_official_028.yaml",
+      "?? _tmp_official_032.yaml",
+      "?? data/train_val/",
+      "?? official_best_models/",
+      "?? outputs/official_028/best_model_avg5.json",
+      "?? outputs/official_028/eval_holdout/",
+      "?? outputs/official_028/eval_holdout_best/",
+      "?? outputs/official_032/"
+    ]
+  },
+  "config": {
+    "data": {
+      "train_dir": "data/train_val",
+      "val_dir": null,
+      "holdout_dir": "data/holdout",
+      "test_dir": "data/test",
+      "val_split": 0.15,
+      "holdout_split": 0.15,
+      "num_workers": 0,
+      "multiprocessing_context": null,
+      "pin_memory": false,
+      "image_size": 224,
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ],
+      "augmentation": {
+        "random_resized_crop": {
+          "scale": [
+            0.85,
+            1.0
+          ],
+          "ratio": [
+            0.9,
+            1.1
+          ]
+        },
+        "random_horizontal_flip": {
+          "prob": 0.5
+        },
+        "color_jitter": {
+          "brightness": 0.08,
+          "contrast": 0.08,
+          "saturation": 0.08,
+          "hue": 0.03
+        },
+        "random_rotation": {
+          "degrees": 0
+        },
+        "rand_augment": null,
+        "mixup_alpha": null,
+        "cutmix_alpha": null
+      }
+    },
+    "model": {
+      "name": "convnext_tiny",
+      "pretrained": true,
+      "num_classes": 4,
+      "dropout": 0.3,
+      "freeze_backbone": false,
+      "init_weights": "outputs/exp_044/best_model.pth"
+    },
+    "training": {
+      "batch_size": 32,
+      "epochs": 35,
+      "optimizer": {
+        "name": "adamw",
+        "lr": 3e-05,
+        "weight_decay": 0.05
+      },
+      "scheduler": {
+        "name": "cosine",
+        "warmup_epochs": 3,
+        "min_lr": 1e-06,
+        "step_size": 15,
+        "step_gamma": 0.1
+      },
+      "loss": {
+        "name": "cross_entropy",
+        "label_smoothing": 0.0
+      },
+      "early_stopping": {
+        "patience": 100,
+        "min_delta": 0.001
+      },
+      "checkpoint": {
+        "save_top_k": 3,
+        "monitor": "val_macro_f1",
+        "mode": "max"
+      },
+      "sampler": {
+        "name": "none"
+      },
+      "ema": {
+        "enabled": true,
+        "decay": 0.999
+      }
+    },
+    "inference": {
+      "device": "cpu",
+      "batch_size": 32,
+      "num_workers": 2,
+      "use_onnx": false,
+      "fp16": false
+    },
+    "logging": {
+      "log_dir": "outputs",
+      "experiment_name": "official_032",
+      "tensorboard": true,
+      "wandb": false,
+      "log_interval": 10
+    },
+    "seed": 42
+  },
+  "training": {
+    "best_epoch": 21,
+    "total_epochs": 35,
+    "early_stopped": false,
+    "train_samples": 3492,
+    "val_samples": 614,
+    "training_time_min": 17.6,
+    "best_val_macro_f1": 0.9545,
+    "best_val_accuracy": 0.9544
+  },
+  "evaluation": {},
+  "benchmark": {},
+  "submit_check": {},
+  "artifacts": {
+    "best_model.pth": "best_model.pth",
+    "training_history.csv": "training_history.csv",
+    "training_log.jsonl": "training_log.jsonl",
+    "config.yaml": "config.yaml",
+    "confusion_matrix_final.png": "confusion_matrix_final.png"
+  }
+}
