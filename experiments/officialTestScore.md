@@ -8,5 +8,13 @@ official006 F1 macro 得分为 0.9033871402794704
 official007 F1 macro 得分为 0.9251746720999676
 official008 F1 macro 得分为 0.9196135987833408
 official009 F1 macro 得分为 0.9372844545957204
+official010 F1 macro 得分为 0.9386891977475803
+official011 F1 macro 得分为 0.92803202202246
+official012 F1 macro 得分为 0.9424167801112596
+official013 F1 macro 得分为 0.945637871473125
+official014
+official018 F1 macro 得分为 0.9445588225726549
+official019 F1 macro 得分为 0.9359164409605192
+official022
+official023
 
-official010-013 当前仅完成本地 val/holdout 评估，尚未提交平台 test。
