@@ -1,117 +1,144 @@
 # Official Leaderboard — Weather Image Classification
 
-> 数据集：官方 70/15/15 split | 更新日期：2026-06-25 | 排序：holdout macro F1 ↓
+> 数据来源：`experiments/officialTestScore.md` 为平台 test ledger；本地 holdout 来自 `outputs/<exp>/eval_holdout/results.json` 或已记录实验结果。
+> 更新日期：2026-06-26。平台已测表按 official test macro F1 排序；pending 实验不混入平台排名。
 
-## 总榜
+## 平台 Test 已测总榜
 
-| # | Experiment | Sz | Model | Macro F1 (holdout) | Macro F1 (val) | Gap | rainy | cloudy | snowy | sunny | Notes |
-|---|------------|----|-------|-------------------:|---------------:|-----|------:|-------:|------:|------:|-------|
-| 1 | official_013 | 224+320 | ConvNeXt-Tiny logits ensemble | **0.9524** | 0.9551 | -0.0027 | 0.9624 | 0.9482 | 0.9492 | 0.9497 | 0.7*009 + 0.3*004 |
-| 2 | official_011 | 224 | ConvNeXt-Tiny (avg) | **0.9507** | 0.9347 | +0.0160 | 0.9692 | 0.9506 | 0.9298 | 0.9530 | top-3 averaging from 007 |
-| 3 | official_012 | 224+320 | ConvNeXt-Tiny logits ensemble | **0.9499** | 0.9535 | -0.0036 | 0.9624 | 0.9433 | 0.9492 | 0.9446 | 0.8*009 + 0.2*004 |
-| 4 | official_007 | 224 | ConvNeXt-Tiny | **0.9456** | 0.9380 | +0.0076 | 0.9474 | 0.9502 | 0.9298 | 0.9549 | EMA tight crop seed=42 |
-| 5 | official_009 | 224 | ConvNeXt-Tiny | **0.9412** | 0.9509 | -0.0097 | 0.9474 | 0.9349 | 0.9412 | 0.9414 | warm-start from exp_054 |
-| 6 | official_010 | 224 | ConvNeXt-Tiny (avg) | **0.9412** | 0.9484 | -0.0072 | 0.9474 | 0.9349 | 0.9412 | 0.9414 | top-3 averaging from 009 |
-| 7 | official_008 | 320 | ConvNeXt-Tiny | **0.9399** | 0.9375 | +0.0024 | 0.9466 | 0.9423 | 0.9231 | 0.9477 | EMA tight crop seed=42 |
-| 8 | official_001 | 320 | ConvNeXt-Tiny | **0.9376** | 0.9366 | +0.0010 | 0.9333 | 0.9467 | 0.9244 | 0.9459 | EMA d=0.3 wd=0.05 |
-| 9 | official_004 | 320 | ConvNeXt-Tiny (avg) | **0.9315** | — | — | 0.9254 | 0.9392 | 0.9180 | 0.9432 | top-3 checkpoint averaging from 002 |
-| 10 | official_006 | 320 | ConvNeXt-Tiny | **0.9291** | 0.9301 | -0.0010 | 0.9185 | 0.9342 | 0.9256 | 0.9381 | no EMA wd=5e-4 |
-| 11 | official_002 | 320 | ConvNeXt-Tiny | **0.9287** | 0.9371 | -0.0084 | 0.9118 | 0.9362 | 0.9256 | 0.9412 | no EMA wd=0.05 |
-| 12 | official_003 | 320 | ConvNeXt-Tiny | **0.9246** | 0.9450 | -0.0204 | 0.9051 | 0.9408 | 0.9076 | 0.9450 | EMA - severe overfit |
-| 13 | official_005 | 320 | ConvNeXt-Tiny | **0.9142** | 0.9400 | -0.0258 | 0.8872 | 0.9318 | 0.8983 | 0.9396 | EMA wd=5e-4 - severe overfit |
+| # | Experiment | 方向 | Local holdout | Official test | Test - Holdout | 推理成本 | 判断 |
+|---|------------|------|--------------:|--------------:|---------------:|----------|------|
+| 1 | official_013 | `0.7*009 + 0.3*004` logits ensemble | 0.9524 | **0.9456** | -0.0068 | 2x ConvNeXt | 当前平台第一 |
+| 2 | official_018 | 224 warm-start from `exp_044`, EMA | 0.9423 | **0.9446** | +0.0023 | 1x ConvNeXt | 当前最强单模型，和 013 很接近 |
+| 3 | official_012 | `0.8*009 + 0.2*004` logits ensemble | 0.9499 | **0.9424** | -0.0075 | 2x ConvNeXt | ensemble 有效，但低于 013 |
+| 4 | official_010 | official_009 top-3 checkpoint averaging | 0.9412 | **0.9387** | -0.0025 | 1x ConvNeXt | 平台小幅高于 009 |
+| 5 | official_009 | 224 warm-start from `exp_054`, seed=42 | 0.9412 | **0.9373** | -0.0039 | 1x ConvNeXt | warm-start 基线 |
+| 6 | official_019 | 256 warm-start from `exp_054` | 0.9540 | 0.9359 | -0.0181 | 1x ConvNeXt | 本地高分不迁移 |
+| 7 | official_004 | official_002 top-3 checkpoint averaging | 0.9315 | 0.9315 | 0.0000 | 1x ConvNeXt | 单独不强，但对 013 有互补 |
+| 8 | official_011 | official_007 top-3 checkpoint averaging | 0.9507 | 0.9280 | -0.0227 | 1x ConvNeXt | 本地 holdout 明显高估 |
+| 9 | official_022 | progressive resize 256->320 | 0.9572 | 0.9253 | -0.0319 | 1x ConvNeXt | 本地最高但平台翻车 |
+| 10 | official_007 | 224 ImageNet init, EMA | 0.9456 | 0.9252 | -0.0204 | 1x ConvNeXt | 非 warm-start 平台不稳 |
+| 11 | official_008 | 320 ImageNet init, EMA | 0.9399 | 0.9196 | -0.0203 | 1x ConvNeXt | 320 未带来平台收益 |
+| 12 | official_005 | 320, wd=5e-4, EMA | 0.9142 | 0.9188 | +0.0046 | 1x ConvNeXt | 分数低，不作主线 |
+| 13 | official_003 | 320, standard aug, EMA | 0.9246 | 0.9158 | -0.0088 | 1x ConvNeXt | 标准增强不稳 |
+| 14 | official_001 | 320 baseline, EMA | 0.9376 | 0.9147 | -0.0229 | 1x ConvNeXt | 平台弱 |
+| 15 | official_002 | 320 baseline, no EMA | 0.9287 | 0.9059 | -0.0228 | 1x ConvNeXt | 不作主线 |
+| 16 | official_006 | 320 low-wd, no EMA | 0.9291 | 0.9034 | -0.0257 | 1x ConvNeXt | 不作主线 |
 
-## Val vs Holdout Gap 分析
+## 平台待测优先级
 
-| Experiment | Val F1 | Holdout F1 | Gap | 判断 |
-|------------|-------:|-----------:|----:|------|
-| official_011 | 0.9347 | 0.9507 | +0.0160 | 本地 holdout 最高单权重，val 明显低估 |
-| official_007 | 0.9380 | 0.9456 | +0.0076 | 稳定泛化，仍是 011 的来源 |
-| official_008 | 0.9375 | 0.9399 | +0.0024 | 稳定泛化 |
-| official_001 | 0.9366 | 0.9376 | +0.0010 | 稳定 |
-| official_006 | 0.9301 | 0.9291 | -0.0010 | 稳定 |
-| official_013 | 0.9551 | 0.9524 | -0.0027 | ensemble 稳定，但 2x 推理成本 |
-| official_012 | 0.9535 | 0.9499 | -0.0036 | ensemble 稳定，低于 013 |
-| official_010 | 0.9484 | 0.9412 | -0.0072 | 未改善 009 holdout |
-| official_002 | 0.9371 | 0.9287 | -0.0084 | 轻微过拟合 |
-| official_009 | 0.9509 | 0.9412 | -0.0097 | 过拟合，但平台 test 当前最高 |
-| official_003 | 0.9450 | 0.9246 | -0.0204 | 严重过拟合 |
-| official_005 | 0.9400 | 0.9142 | -0.0258 | 严重过拟合 |
+| 提交优先级 | Experiment | 配置 | Local holdout | 推理成本 | 统一权重文件 | 判断 |
+|------------|------------|------|--------------:|----------|--------------|------|
+| P0 | official_030 | official_013 logits + cloudy `-0.5` class bias | **0.9541** | 2x ConvNeXt | `outputs/official_030/official_030_best_model.pth` | 唯一正向后处理信号；先测，但有 holdout 拟合风险 |
+| P1 | official_025 | `0.7*official_018 + 0.3*official_004` | 0.9439 | 2x ConvNeXt | `outputs/official_025/official_025_best_model.pth` | 验证用平台更强的 018 替换 009 后，004 是否仍互补 |
+| P2 | official_031 | official_018 original + horizontal flip TTA | 0.9431 | 2x TTA | `outputs/official_031/official_031_best_model.pth` | 轻量 TTA 对照，平台时间允许再测 |
+| P3 | official_024 | official_018 top-3 checkpoint averaging | 0.9423 | 1x ConvNeXt | `outputs/official_024/official_024_best_model.pth` | 1x 成本，但本地未超过 018 |
+| Skip | official_026 | `0.8*official_018 + 0.2*official_004` | 0.9423 | 2x ConvNeXt | `outputs/official_026/official_026_best_model.pth` | 被 025 支配 |
+| Skip | official_027 | `0.5*018 + 0.35*009 + 0.15*004` | 0.9418 | 3x ConvNeXt | `outputs/official_027/official_027_best_model.pth` | 成本高，且本地低于 025/031 |
+| Skip | official_029 | 027-style ensemble + temperature scaling | 0.9418 | 3x ConvNeXt | `outputs/official_029/official_029_best_model.pth` | temperature calibration 未带来本地收益 |
 
-## 关键发现
+旧 pending 项：`official_014` 和 `official_023` 在 `officialTestScore.md` 里仍无平台分数；当前不优先于 P0/P1/P2。
 
-1. **official_011 是当前本地最高单权重**：007 top-3 averaging 后 holdout 从 0.9456 提升到 0.9507，rainy F1 达 0.9692。
-2. **official_013 是当前本地最高整体模型**：0.7*009 + 0.3*004 的 logits ensemble holdout 0.9524，高于 012 的 0.9499。
-3. **official_010 没有改善 warm-start holdout**：009 top-3 averaging 后 holdout 仍为 0.9412，且 val 从 0.9509 降到 0.9484。
-4. **本地和平台仍不完全一致**：009 本地 holdout 低于 007/011/013，但平台 test 当前最高，因此 011/013 必须平台复核。
-5. **ensemble 有收益但有成本**：012/013 都需要 224+320 两个 ConvNeXt 推理，只有平台 test 提升足够时才值得作为最终提交。
+## 本地 Holdout 参考榜
 
-## 提交建议
+本表只用于筛选，不代表平台排序。`official_022/019/011` 已证明本地高分可能严重不迁移。
 
-下一批平台 test 优先级：
+| # | Experiment | 方向 | Local holdout | Official test | 备注 |
+|---|------------|------|--------------:|--------------:|------|
+| 1 | official_022 | progressive resize 256->320 | **0.9572** | 0.9253 | 本地最高但平台翻车 |
+| 2 | official_030 | class-bias calibrated official_013 | **0.9541** | pending | 本轮最值得平台小步验证 |
+| 3 | official_019 | 256 warm-start | **0.9540** | 0.9359 | 本地高分不迁移 |
+| 4 | official_013 | 009/004 logits ensemble | **0.9524** | **0.9456** | 当前平台第一 |
+| 5 | official_011 | 007 top-3 averaging | **0.9507** | 0.9280 | holdout 高估 |
+| 6 | official_012 | 009/004 logits ensemble | 0.9499 | 0.9424 | 低于 013 |
+| 7 | official_020 | ConvNeXt-Small capacity probe | 0.9470 | — | 大模型未作为主线 |
+| 8 | official_023 | size 288 probe | 0.9461 | pending | 过拟合，旧 pending |
+| 9 | official_007 | 224 ImageNet init, EMA | 0.9456 | 0.9252 | 平台不稳 |
+| 10 | official_025 | 018/004 logits ensemble | 0.9439 | pending | P1 平台待测 |
+| 11 | official_031 | official_018 hflip TTA | 0.9431 | pending | P2 平台待测 |
+| 12 | official_018 | 224 warm-start from `exp_044` | 0.9423 | 0.9446 | 最强单模型平台候选 |
+| 13 | official_024 | official_018 top-3 averaging | 0.9423 | pending | averaging 未提升 |
+| 14 | official_026 | 018/004 conservative ensemble | 0.9423 | pending | 被 025 支配 |
+| 15 | official_027 | 018/009/004 ensemble | 0.9418 | pending | 3x 成本，不优先 |
+| 16 | official_029 | temperature calibrated ensemble | 0.9418 | pending | 未提升 |
+| 17 | official_009 | 224 warm-start from `exp_054` | 0.9412 | 0.9373 | warm-start 基线 |
+| 18 | official_010 | official_009 top-3 averaging | 0.9412 | 0.9387 | 平台小幅高于 009 |
+| 19 | official_014 | warm-start seed=7 | 0.9385 | pending | 低于 018/013 |
+| 20 | official_017 | warm-start no EMA | 0.9316 | — | no EMA 不优先 |
+| 21 | official_015 | warm-start seed=2026 | 0.9248 | — | seed 方差偏低 |
+| 22 | official_016 | warm-start lr=1e-5 | 0.9179 | — | 低 lr 不如 3e-5 |
+| 23 | official_017_avg | official_017 top-3 averaging | 0.9144 | — | averaging 翻车 |
 
-1. **official_011**：最高本地单权重，推理成本仍是 1x ConvNeXt。
-2. **official_013**：最高本地整体模型，但需要 2x 推理成本和 ensemble submission 支持。
-3. **official_012**：作为 013 的低 004 权重对照；若平台预算紧张可跳过。
-4. **official_010**：本地未超过 009，暂不优先提交。
+## 子榜 A — 平台已验证主线
 
----
+| # | Experiment | 方向 | Official test | Local holdout | 结论 |
+|---|------------|------|--------------:|--------------:|------|
+| 1 | official_013 | 009/004 logits ensemble | **0.9456** | 0.9524 | 平台最高，但 2x 成本 |
+| 2 | official_018 | 224 warm-start from `exp_044` | **0.9446** | 0.9423 | 最强 1x 候选 |
+| 3 | official_012 | 009/004 logits ensemble | **0.9424** | 0.9499 | ensemble 有效但低于 013 |
+| 4 | official_010 | 009 top-3 averaging | **0.9387** | 0.9412 | averaging 在平台小幅超过 009 |
+| 5 | official_009 | 224 warm-start from `exp_054` | **0.9373** | 0.9412 | 已被 010/012/013/018 超过 |
 
-## 子榜 A — 单模型 Top 5
+## 子榜 B — 新后处理与提交候选
 
-| # | Experiment | Sz | Macro F1 | rainy | cloudy | snowy | sunny | 备注 |
-|---|------------|----|---------:|------:|-------:|------:|------:|------|
-| 1 | official_007 | 224 | 0.9456 | 0.9474 | 0.9502 | 0.9298 | 0.9549 | EMA tight crop |
-| 2 | official_009 | 224 | 0.9412 | 0.9474 | 0.9349 | 0.9412 | 0.9414 | warm-start exp_054 |
-| 3 | official_008 | 320 | 0.9399 | 0.9466 | 0.9423 | 0.9231 | 0.9477 | EMA tight crop |
-| 4 | official_001 | 320 | 0.9376 | 0.9333 | 0.9467 | 0.9244 | 0.9459 | EMA baseline |
-| 5 | official_006 | 320 | 0.9291 | 0.9185 | 0.9342 | 0.9256 | 0.9381 | no EMA wd=5e-4 |
+| # | Experiment | 方向 | Local holdout | vs official_018 holdout | vs official_013 holdout | 平台动作 |
+|---|------------|------|--------------:|------------------------:|------------------------:|----------|
+| 1 | official_030 | class bias on official_013 | **0.9541** | +0.0118 | +0.0017 | P0，先测 |
+| 2 | official_025 | `0.7*018 + 0.3*004` | 0.9439 | +0.0016 | -0.0085 | P1，可测 |
+| 3 | official_031 | official_018 hflip TTA | 0.9431 | +0.0008 | -0.0093 | P2，可测 |
+| 4 | official_024 | official_018 checkpoint averaging | 0.9423 | +0.0000 | -0.0101 | P3，低优先 |
+| 5 | official_026 | `0.8*018 + 0.2*004` | 0.9423 | +0.0000 | -0.0101 | Skip |
+| 6 | official_027 | `0.5*018 + 0.35*009 + 0.15*004` | 0.9418 | -0.0005 | -0.0106 | Skip |
+| 7 | official_029 | temperature calibrated 027-style ensemble | 0.9418 | -0.0005 | -0.0106 | Skip |
 
-## 子榜 B — Checkpoint Averaging
+## 子榜 C — Warm-start Seed / LR / EMA 对照
 
-| # | Experiment | 源实验 | Top-K | Macro F1 | vs 源模型 | 备注 |
-|---|------------|--------|-------|---------:|----------:|------|
-| 1 | official_011 | 007 | 3 | 0.9507 | **+0.0051** | 最大提升，rainy 0.9692 |
-| 2 | official_004 | 002 | 3 | 0.9315 | +0.0028 | 小幅提升 |
-| 3 | official_010 | 009 | 3 | 0.9412 | 0.0000 | 未改善，源模型已足够稳定 |
+| Experiment | 配置 | Val F1 | Holdout F1 | Official test | 判断 |
+|------------|------|-------:|-----------:|--------------:|------|
+| official_009 | seed=42, EMA, lr=3e-5, `exp_054` warm-start | 0.9509 | 0.9412 | 0.9373 | 原 warm-start 基线 |
+| official_014 | seed=7, EMA | 0.9473 | 0.9385 | pending | seed=7 稳定但低于 009/018 |
+| official_015 | seed=2026, EMA | 0.9431 | 0.9248 | — | 不优先 |
+| official_016 | lr=1e-5, EMA | 0.9399 | 0.9179 | — | lr=1e-5 不如 3e-5 |
+| official_017 | no EMA | 0.9463 | 0.9316 | — | no EMA 不如 EMA |
+| official_017_avg | no EMA top-3 averaging | — | 0.9144 | — | averaging 翻车 |
+| official_018 | seed=42, EMA, lr=3e-5, `exp_044` warm-start | 0.9467 | 0.9423 | 0.9446 | 当前最强单模型 |
 
-结论：averaging 对 007 有效（+0.5），对 002 微有效（+0.3），对 009 无效（warm-start 已收敛）。
+结论：继续随机 seed 碰运气价值低；`official_018` 的 warm-start 来源比 `official_009` 更适合作为单模型主线。
 
-## 子榜 C — Ensemble
+## 子榜 D — 分辨率 / Backbone 探索
 
-| # | Experiment | 组成 | Macro F1 | rainy | 推理成本 | 备注 |
-|---|------------|------|---------:|------:|---------:|------|
-| 1 | official_013 | 0.7×009 + 0.3×004 | 0.9524 | 0.9624 | 2× ConvNeXt | 最高本地，009+004 互补 |
-| 2 | official_012 | 0.8×009 + 0.2×004 | 0.9499 | 0.9624 | 2× ConvNeXt | 013 低 004 权重的对照 |
+| Experiment | 配置 | Val F1 | Holdout F1 | Official test | 判断 |
+|------------|------|-------:|-----------:|--------------:|------|
+| official_018 | 224 ConvNeXt-Tiny | 0.9467 | 0.9423 | **0.9446** | 平台最稳 |
+| official_019 | 256 ConvNeXt-Tiny | 0.9543 | 0.9540 | 0.9359 | 本地不迁移 |
+| official_020 | 224 ConvNeXt-Small | 0.9457 | 0.9470 | — | 更大 backbone 未显示必要性 |
+| official_022 | 256->320 progressive resize | 0.9551 | 0.9572 | 0.9253 | 平台翻车，停止 resize 主线 |
+| official_023 | 288 ConvNeXt-Tiny | 0.9568 | 0.9461 | pending | 旧 pending，不优先 |
 
-> 012/013 无 .pth 文件：logits ensemble 不训练新模型，仅在推理时加权平均已有模型的输出。
+结论：本阶段不继续扩大分辨率或 backbone；平台反馈更支持 224 warm-start 与轻量 ensemble。
 
-## 子榜 D — EMA 消融
+## 子榜 E — Averaging / Ensemble
 
-| # | Experiment | EMA | WD | Macro F1 | Gap | 判断 |
-|---|------------|-----|-----|---------:|----:|------|
-| 1 | official_001 | ✓ | 0.05 | 0.9376 | +0.0010 | 稳定 |
-| 2 | official_002 | ✗ | 0.05 | 0.9287 | -0.0084 | 无 EMA，val→holdout 下降明显 |
-| 3 | official_003 | ✓ | 0.05 | 0.9246 | -0.0204 | EMA 但严重过拟合 |
-| 4 | official_006 | ✗ | 5e-4 | 0.9291 | -0.0010 | 无 EMA 但 Gap 小 |
-| 5 | official_005 | ✓ | 5e-4 | 0.9142 | -0.0258 | EMA + 低 wd，严重过拟合 |
+| Experiment | 类型 | 组成 | Local holdout | Official test | 结论 |
+|------------|------|------|--------------:|--------------:|------|
+| official_004 | checkpoint averaging | official_002 top-3 | 0.9315 | 0.9315 | 单独不强，但作为 013 互补分支有效 |
+| official_010 | checkpoint averaging | official_009 top-3 | 0.9412 | 0.9387 | 平台小幅超过 009 |
+| official_011 | checkpoint averaging | official_007 top-3 | 0.9507 | 0.9280 | holdout 高估 |
+| official_012 | logits ensemble | `0.8*009 + 0.2*004` | 0.9499 | 0.9424 | 有效但低于 013 |
+| official_013 | logits ensemble | `0.7*009 + 0.3*004` | 0.9524 | **0.9456** | 当前平台第一 |
+| official_024 | checkpoint averaging | official_018 top-3 | 0.9423 | pending | 未提升 018 |
+| official_025 | logits ensemble | `0.7*018 + 0.3*004` | 0.9439 | pending | 平台可测但本地低于 013 |
+| official_030 | class-bias ensemble | official_013 + cloudy `-0.5` | 0.9541 | pending | 本地最高，需平台验证是否过拟合 |
 
-## 子榜 E — 输入尺寸 224 vs 320
+## 当前结论
 
-| # | Experiment | Sz | Macro F1 | 推理时间 | 备注 |
-|---|------------|----|---------:|---------:|------|
-| 1 | official_007 | 224 | 0.9456 | ~2.5s | 单权重最高 |
-| 2 | official_008 | 320 | 0.9399 | ~4.0s | 320 最高 |
-| 3 | official_001 | 320 | 0.9376 | ~4.8s | 320 baseline |
+1. **平台正式分数第一仍是 `official_013`**：0.9456，成本是 2x ConvNeXt。
+2. **`official_018` 是最强 1x 候选**：平台 0.9446，仅比 013 低约 0.0011。
+3. **本地 holdout 不能单独排序决策**：`official_022/019/011` 本地很高，但平台明显掉分。
+4. **本轮新增只建议优先测 `official_030`**：它是唯一超过 013 holdout 的后处理，但 bias 由 holdout 搜索得到，平台风险明确。
+5. **`official_025/031/024` 是次级验证**：分别验证 018+004 互补、flip TTA、018 averaging；`026/027/029` 暂不提交。
 
-224 全面优于 320：holdout 更高 + 推理快 ~40%。
+## Artifact 说明
 
-## 子榜 F — 训练策略对比
-
-| 策略 | Experiment | Macro F1 | 说明 |
-|------|------------|---------:|------|
-| 从头训练 (EMA) | official_007 | 0.9456 | EMA tight crop seed=42 |
-| Warm-start | official_009 | 0.9412 | 从 exp_054 初始化 |
-| Averaging | official_011 | 0.9507 | 007 top-3 平均 |
-| Ensemble | official_013 | 0.9524 | 009 + 004 加权 |
-
-Warm-start 对平台 test 最有效（009 = 0.9373），但本地 holdout 上 Averaging 和 Ensemble 更高。需平台复核。
+- 统一平台提交权重命名：`outputs/official_xxx/official_xxx_best_model.pth`。
+- `.pth` 大权重被 `.gitignore` 忽略，不进入 Git；Git 中保留 `official_xxx_bundle.json`、`results.json`、`predictions.csv`、`error_samples.csv` 和混淆矩阵。
+- 012/013/025/026/027/029/030/031 是 submission bundle 或推理时后处理，不是新训练出的单一 ConvNeXt `state_dict`。
