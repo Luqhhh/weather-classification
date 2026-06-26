@@ -1,0 +1,237 @@
+{
+  "experiment_id": "official_036",
+  "status": "partial",
+  "created_at": "2026-06-26T08:48:08.483379+00:00",
+  "branch": "main",
+  "commit_hash": "04585c5a",
+  "model": "logits_ensemble",
+  "image_size": "224",
+  "loss": "logits_average",
+  "augmentation": "default",
+  "dropout": "0.3",
+  "batch_size": "32",
+  "val_macro_f1": "0.9303",
+  "cloudy_f1": "0.9279",
+  "rainy_f1": "0.9242",
+  "snowy_f1": "0.9344",
+  "sunny_f1": "0.9347",
+  "cpu_time_per_image": "",
+  "model_size_mb": "",
+  "submit_check_passed": "",
+  "notes": "official_036 holdout: 0.7*official_033 3-fold + 0.3*official_004 logits ensemble",
+  "git": {
+    "branch": "main",
+    "commit_hash": "04585c5a",
+    "commit_message": "docs: update TestScore&main.py",
+    "dirty": true,
+    "dirty_files": [
+      "?? outputs/official_028/eval_holdout/",
+      "?? outputs/official_028/official_028_bundle.json",
+      "?? outputs/official_033/",
+      "?? outputs/official_035/",
+      "?? outputs/official_036/"
+    ]
+  },
+  "config": {
+    "data": {
+      "augmentation": {
+        "color_jitter": {
+          "brightness": 0.08,
+          "contrast": 0.08,
+          "hue": 0.03,
+          "saturation": 0.08
+        },
+        "cutmix_alpha": null,
+        "mixup_alpha": null,
+        "rand_augment": null,
+        "random_horizontal_flip": {
+          "prob": 0.5
+        },
+        "random_resized_crop": {
+          "ratio": [
+            0.9,
+            1.1
+          ],
+          "scale": [
+            0.85,
+            1.0
+          ]
+        },
+        "random_rotation": {
+          "degrees": 0
+        }
+      },
+      "holdout_dir": "data/holdout",
+      "holdout_split": 0.15,
+      "image_size": 224,
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "multiprocessing_context": null,
+      "num_workers": 0,
+      "pin_memory": false,
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ],
+      "test_dir": "data/test",
+      "train_dir": "data/train",
+      "val_dir": "data/val",
+      "val_split": 0.15
+    },
+    "inference": {
+      "batch_size": 32,
+      "device": "cpu",
+      "fp16": false,
+      "num_workers": 2,
+      "use_onnx": false
+    },
+    "logging": {
+      "experiment_name": "official_028",
+      "log_dir": "outputs",
+      "log_interval": 10,
+      "tensorboard": true,
+      "wandb": false
+    },
+    "model": {
+      "dropout": 0.3,
+      "freeze_backbone": false,
+      "init_weights": "outputs/exp_044/best_model.pth",
+      "name": "logits_ensemble",
+      "num_classes": 4,
+      "pretrained": true
+    },
+    "seed": 42,
+    "training": {
+      "batch_size": 32,
+      "checkpoint": {
+        "mode": "max",
+        "monitor": "val_macro_f1",
+        "save_top_k": 5
+      },
+      "early_stopping": {
+        "min_delta": 0.001,
+        "patience": 10
+      },
+      "ema": {
+        "decay": 0.999,
+        "enabled": true
+      },
+      "epochs": 50,
+      "loss": {
+        "name": "logits_average"
+      },
+      "optimizer": {
+        "lr": 3e-05,
+        "name": "adamw",
+        "weight_decay": 0.05
+      },
+      "sampler": {
+        "name": "none"
+      },
+      "scheduler": {
+        "min_lr": 1e-06,
+        "name": "cosine",
+        "step_gamma": 0.1,
+        "step_size": 15,
+        "warmup_epochs": 3
+      }
+    },
+    "ensemble": {
+      "type": "logits_average",
+      "members": [
+        {
+          "weights": "outputs/official_033/folds/official_033_fold1_best_model.pth",
+          "config": "outputs/official_028/config.yaml",
+          "weight": 0.2333333333
+        },
+        {
+          "weights": "outputs/official_033/folds/official_033_fold2_best_model.pth",
+          "config": "outputs/official_028/config.yaml",
+          "weight": 0.2333333333
+        },
+        {
+          "weights": "outputs/official_033/folds/official_033_fold3_best_model.pth",
+          "config": "outputs/official_028/config.yaml",
+          "weight": 0.2333333333
+        },
+        {
+          "weights": "outputs/official_004/best_model.pth",
+          "config": "outputs/official_002/config.yaml",
+          "weight": 0.3
+        }
+      ]
+    }
+  },
+  "training": {},
+  "evaluation": {
+    "macro_f1": 0.9303,
+    "accuracy": 0.9308,
+    "per_class": {
+      "cloudy": {
+        "precision": 0.9497,
+        "recall": 0.9071,
+        "f1": 0.9279,
+        "support": 312
+      },
+      "rainy": {
+        "precision": 0.9242,
+        "recall": 0.9242,
+        "f1": 0.9242,
+        "support": 66
+      },
+      "snowy": {
+        "precision": 0.9194,
+        "recall": 0.95,
+        "f1": 0.9344,
+        "support": 60
+      },
+      "sunny": {
+        "precision": 0.9158,
+        "recall": 0.9544,
+        "f1": 0.9347,
+        "support": 285
+      }
+    },
+    "confusion_matrix": [
+      [
+        283,
+        5,
+        1,
+        23
+      ],
+      [
+        5,
+        61,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        57,
+        2
+      ],
+      [
+        9,
+        0,
+        4,
+        272
+      ]
+    ],
+    "weak_classes": [
+      "cloudy",
+      "rainy"
+    ],
+    "avg_per_class_f1": 0.9303
+  },
+  "benchmark": {},
+  "submit_check": {},
+  "artifacts": {
+    "confusion_matrix.png": "confusion_matrix.png",
+    "error_samples.csv": "error_samples.csv"
+  }
+}

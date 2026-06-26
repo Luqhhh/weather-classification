@@ -44,6 +44,7 @@ weights/*.ckpt
 # Outputs — track experiment logs (small text), ignore model weights (large binary)
 outputs/*/best_model.pth
 outputs/*/*.pth
+outputs/**/*.pth
 outputs/*/checkpoints/
 # Keep .gitkeep and label_mapping.json trackable
 !outputs/.gitkeep

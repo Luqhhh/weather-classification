@@ -1,0 +1,38 @@
+{
+  "type": "logits_ensemble",
+  "source_experiment": "official_036",
+  "labels": [
+    "cloudy",
+    "rainy",
+    "snowy",
+    "sunny"
+  ],
+  "holdout_macro_f1": 0.9303,
+  "note": "official_036 = 0.7*official_033 3-fold + 0.3*official_004 logits ensemble; local holdout is low priority.",
+  "members": [
+    {
+      "experiment_id": "official_033_fold1",
+      "source": "outputs/official_033/folds/official_033_fold1_best_model.pth",
+      "weight": 0.2333333333,
+      "image_size": 224
+    },
+    {
+      "experiment_id": "official_033_fold2",
+      "source": "outputs/official_033/folds/official_033_fold2_best_model.pth",
+      "weight": 0.2333333333,
+      "image_size": 224
+    },
+    {
+      "experiment_id": "official_033_fold3",
+      "source": "outputs/official_033/folds/official_033_fold3_best_model.pth",
+      "weight": 0.2333333333,
+      "image_size": 224
+    },
+    {
+      "experiment_id": "official_004",
+      "source": "outputs/official_004/best_model.pth",
+      "weight": 0.3,
+      "image_size": 320
+    }
+  ]
+}

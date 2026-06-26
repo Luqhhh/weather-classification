@@ -1,0 +1,31 @@
+{
+  "type": "logits_ensemble",
+  "source_experiment": "official_033",
+  "labels": [
+    "cloudy",
+    "rainy",
+    "snowy",
+    "sunny"
+  ],
+  "note": "official_033 = 3-fold ConvNeXt-Tiny 224 warm-start logits ensemble; not a weight-averaged checkpoint.",
+  "members": [
+    {
+      "experiment_id": "official_033_fold1",
+      "source": "outputs/official_033/folds/official_033_fold1_best_model.pth",
+      "weight": 0.3333333333333333,
+      "image_size": 224
+    },
+    {
+      "experiment_id": "official_033_fold2",
+      "source": "outputs/official_033/folds/official_033_fold2_best_model.pth",
+      "weight": 0.3333333333333333,
+      "image_size": 224
+    },
+    {
+      "experiment_id": "official_033_fold3",
+      "source": "outputs/official_033/folds/official_033_fold3_best_model.pth",
+      "weight": 0.3333333333333333,
+      "image_size": 224
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "type": "logits_ensemble",
+  "source_experiment": "official_028",
+  "base_experiment": "official_018",
+  "labels": [
+    "cloudy",
+    "rainy",
+    "snowy",
+    "sunny"
+  ],
+  "note": "official_028 = SWA/dense averaging branch from official_018; wrapped as one-member bundle to preserve image_size=224.",
+  "members": [
+    {
+      "experiment_id": "official_028",
+      "source": "outputs/official_028/best_model.pth",
+      "weight": 1.0,
+      "image_size": 224
+    }
+  ]
+}
