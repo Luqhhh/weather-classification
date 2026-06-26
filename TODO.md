@@ -8,11 +8,7 @@
 |------------|----|--------------:|----------|--------------|----------|
 | P0 | official_035 | 0.9439 | 2x ConvNeXt | `outputs/official_035/official_035_best_model.pth` | 可测；025 平台第一后，验证 028 分支替换 018 是否还有微小收益 |
 | P1 | official_028 | 0.9423 | 1x ConvNeXt | `outputs/official_028/official_028_best_model.pth` | 可测；024 已证明 018 averaging 平台有效，028 是更密集平均分支 |
-| Skip | official_026 | 0.9423 | 2x ConvNeXt | `outputs/official_026/official_026_best_model.pth` | 暂不测；被 025 支配 |
-| Skip | official_027 | 0.9418 | 3x ConvNeXt | `outputs/official_027/official_027_best_model.pth` | 暂不测；成本高且本地低于 025/031 |
-| Skip | official_029 | 0.9418 | 3x ConvNeXt | `outputs/official_029/official_029_best_model.pth` | 暂不测；temperature calibration 未带来本地收益 |
-| Skip | official_033 | 0.9224 | 3x ConvNeXt | `outputs/official_033/official_033_best_model.pth` | 暂不测；3-fold ensemble 本地显著低于主线 |
-| Skip | official_036 | 0.9303 | 4x ConvNeXt | `outputs/official_036/official_036_best_model.pth` | 暂不测；033+004 未恢复，成本过高 |
+
 
 `official_024/025/030/031` 已经有平台正式分数；当前平台第一是 `official_025`，最强 1x 是 `official_024`。
 
