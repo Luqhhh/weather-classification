@@ -1,0 +1,19 @@
+{
+  "output": "outputs\\official_017_avg\\averaged_model.pth",
+  "metric": "val_macro_f1",
+  "mode": "max",
+  "checkpoints": [
+    {
+      "path": "outputs\\official_017\\checkpoints\\epoch_001_val_macro_f1_0.9208.pth",
+      "val_macro_f1": 0.9208
+    },
+    {
+      "path": "outputs\\official_017\\checkpoints\\epoch_002_val_macro_f1_0.9392.pth",
+      "val_macro_f1": 0.9392
+    },
+    {
+      "path": "outputs\\official_017\\checkpoints\\epoch_004_val_macro_f1_0.9463.pth",
+      "val_macro_f1": 0.9463
+    }
+  ]
+}

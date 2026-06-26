@@ -1,0 +1,11 @@
+{
+  "branch": "feature/official-warmstart-seeds",
+  "commit_hash": "401b5d9f",
+  "commit_message": "feat: register capacity probe backbones",
+  "dirty": true,
+  "dirty_files": [
+    "M reports/confusion_matrix.png",
+    " M reports/results.json",
+    "?? outputs/official_014/"
+  ]
+}
