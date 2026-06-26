@@ -1,0 +1,16 @@
+{
+  "branch": "main",
+  "commit_hash": "191f1701",
+  "commit_message": "docs: update official leaderboard",
+  "dirty": true,
+  "dirty_files": [
+    "M reports/confusion_matrix.png",
+    " M reports/results.json",
+    "?? data/fold1/",
+    "?? data/fold2/",
+    "?? data/fold3/",
+    "?? memory/weight-naming-and-git-workflow.md",
+    "?? outputs/official_033_fold1/",
+    "?? outputs/official_033_fold2/"
+  ]
+}

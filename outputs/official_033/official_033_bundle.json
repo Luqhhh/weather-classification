@@ -1,0 +1,27 @@
+{
+  "type": "logits_ensemble",
+  "source_experiment": "official_033",
+  "labels": ["cloudy", "rainy", "snowy", "sunny"],
+  "holdout_macro_f1": 0.9224,
+  "note": "official_033 = 3-fold warm-start ensemble (fold1+fold2+fold3), equal weights",
+  "members": [
+    {
+      "experiment_id": "official_033_fold1",
+      "source": "outputs/official_033_fold1/official_033_fold1_best_model.pth",
+      "weight": 0.333,
+      "image_size": 224
+    },
+    {
+      "experiment_id": "official_033_fold2",
+      "source": "outputs/official_033_fold2/official_033_fold2_best_model.pth",
+      "weight": 0.333,
+      "image_size": 224
+    },
+    {
+      "experiment_id": "official_033_fold3",
+      "source": "outputs/official_033_fold3/official_033_fold3_best_model.pth",
+      "weight": 0.333,
+      "image_size": 224
+    }
+  ]
+}

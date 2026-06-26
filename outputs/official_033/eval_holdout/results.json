@@ -1,37 +1,40 @@
 {
-  "experiment_id": "reports",
+  "experiment_id": "eval_holdout",
   "status": "partial",
-  "created_at": "2026-06-25T13:51:51.628763+00:00",
-  "branch": "feature/official-warmstart-seeds",
-  "commit_hash": "401b5d9f",
-  "model": "convnext_tiny",
+  "created_at": "2026-06-26T08:26:44.367481+00:00",
+  "branch": "main",
+  "commit_hash": "191f1701",
+  "model": "logits_ensemble",
   "image_size": "224",
-  "loss": "cross_entropy",
+  "loss": "logits_average",
   "augmentation": "default",
   "dropout": "0.3",
   "batch_size": "32",
-  "val_macro_f1": "0.9144",
-  "cloudy_f1": "0.9196",
-  "rainy_f1": "0.9048",
-  "snowy_f1": "0.8947",
-  "sunny_f1": "0.9384",
+  "val_macro_f1": "0.9224",
+  "cloudy_f1": "0.9183",
+  "rainy_f1": "0.9091",
+  "snowy_f1": "0.9344",
+  "sunny_f1": "0.9276",
   "cpu_time_per_image": "",
   "model_size_mb": "",
   "submit_check_passed": "",
   "notes": "",
   "git": {
-    "branch": "feature/official-warmstart-seeds",
-    "commit_hash": "401b5d9f",
-    "commit_message": "feat: register capacity probe backbones",
+    "branch": "main",
+    "commit_hash": "191f1701",
+    "commit_message": "docs: update official leaderboard",
     "dirty": true,
     "dirty_files": [
       "M reports/confusion_matrix.png",
       " M reports/results.json",
-      "?? outputs/official_014/",
-      "?? outputs/official_015/",
-      "?? outputs/official_016/",
-      "?? outputs/official_017/",
-      "?? outputs/official_017_avg/"
+      "?? data/fold1/",
+      "?? data/fold2/",
+      "?? data/fold3/",
+      "?? memory/weight-naming-and-git-workflow.md",
+      "?? outputs/official_033/",
+      "?? outputs/official_033_fold1/",
+      "?? outputs/official_033_fold2/",
+      "?? outputs/official_033_fold3/"
     ]
   },
   "config": {
@@ -102,7 +105,7 @@
       "dropout": 0.3,
       "freeze_backbone": false,
       "init_weights": "outputs/old/exp_054/best_model.pth",
-      "name": "convnext_tiny",
+      "name": "logits_ensemble",
       "num_classes": 4,
       "pretrained": true
     },
@@ -124,8 +127,7 @@
       },
       "epochs": 50,
       "loss": {
-        "label_smoothing": 0.0,
-        "name": "cross_entropy"
+        "name": "logits_average"
       },
       "optimizer": {
         "lr": 3e-05,
@@ -142,75 +144,94 @@
         "step_size": 15,
         "warmup_epochs": 3
       }
+    },
+    "ensemble": {
+      "type": "logits_average",
+      "members": [
+        {
+          "weights": "outputs\\official_033_fold1\\official_033_fold1_best_model.pth",
+          "config": "outputs\\official_009\\config.yaml",
+          "weight": 1.0
+        },
+        {
+          "weights": "outputs\\official_033_fold2\\official_033_fold2_best_model.pth",
+          "config": "outputs\\official_009\\config.yaml",
+          "weight": 1.0
+        },
+        {
+          "weights": "outputs\\official_033_fold3\\official_033_fold3_best_model.pth",
+          "config": "outputs\\official_009\\config.yaml",
+          "weight": 1.0
+        }
+      ]
     }
   },
   "training": {},
   "evaluation": {
-    "macro_f1": 0.9144,
-    "accuracy": 0.9239,
+    "macro_f1": 0.9224,
+    "accuracy": 0.9225,
     "per_class": {
       "cloudy": {
-        "precision": 0.9226,
-        "recall": 0.9167,
-        "f1": 0.9196,
+        "precision": 0.9367,
+        "recall": 0.9006,
+        "f1": 0.9183,
         "support": 312
       },
       "rainy": {
-        "precision": 0.95,
-        "recall": 0.8636,
-        "f1": 0.9048,
+        "precision": 0.9091,
+        "recall": 0.9091,
+        "f1": 0.9091,
         "support": 66
       },
       "snowy": {
-        "precision": 0.9444,
-        "recall": 0.85,
-        "f1": 0.8947,
+        "precision": 0.9194,
+        "recall": 0.95,
+        "f1": 0.9344,
         "support": 60
       },
       "sunny": {
-        "precision": 0.9164,
-        "recall": 0.9614,
-        "f1": 0.9384,
+        "precision": 0.9119,
+        "recall": 0.9439,
+        "f1": 0.9276,
         "support": 285
       }
     },
     "confusion_matrix": [
       [
-        286,
-        3,
-        1,
-        22
-      ],
-      [
-        9,
-        57,
-        0,
-        0
-      ],
-      [
+        281,
         6,
-        0,
-        51,
-        3
+        1,
+        24
       ],
       [
-        9,
+        5,
+        60,
         0,
+        1
+      ],
+      [
         2,
-        274
+        0,
+        57,
+        1
+      ],
+      [
+        12,
+        0,
+        4,
+        269
       ]
     ],
     "weak_classes": [
-      "rainy",
-      "snowy"
+      "cloudy",
+      "rainy"
     ],
-    "avg_per_class_f1": 0.9144
+    "avg_per_class_f1": 0.9224
   },
   "benchmark": {},
   "submit_check": {},
   "artifacts": {
     "confusion_matrix.png": "confusion_matrix.png",
-    "error_samples.csv": "error_samples.csv",
-    "cpu_benchmark.csv": "cpu_benchmark.csv"
+    "error_samples.csv": "error_samples.csv"
   }
 }

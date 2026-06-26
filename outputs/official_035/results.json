@@ -1,0 +1,53 @@
+{
+  "1.0": {
+    "macro_f1": 0.9066,
+    "accuracy": 0.9129,
+    "per_class": {
+      "cloudy": 0.9114,
+      "rainy": 0.8992,
+      "snowy": 0.8943,
+      "sunny": 0.9215
+    }
+  },
+  "1.5": {
+    "macro_f1": 0.9252,
+    "accuracy": 0.9253,
+    "per_class": {
+      "cloudy": 0.9228,
+      "rainy": 0.916,
+      "snowy": 0.9333,
+      "sunny": 0.9284
+    }
+  },
+  "2.0": {
+    "macro_f1": 0.9283,
+    "accuracy": 0.9225,
+    "per_class": {
+      "cloudy": 0.9153,
+      "rainy": 0.9231,
+      "snowy": 0.9508,
+      "sunny": 0.9241
+    }
+  },
+  "2.5": {
+    "macro_f1": 0.9226,
+    "accuracy": 0.9225,
+    "per_class": {
+      "cloudy": 0.9173,
+      "rainy": 0.8939,
+      "snowy": 0.95,
+      "sunny": 0.9289
+    }
+  },
+  "3.0": {
+    "macro_f1": 0.8996,
+    "accuracy": 0.9059,
+    "per_class": {
+      "cloudy": 0.9026,
+      "rainy": 0.8682,
+      "snowy": 0.9106,
+      "sunny": 0.917
+    }
+  },
+  "best_temperature": 2.0
+}
